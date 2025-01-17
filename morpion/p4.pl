@@ -119,8 +119,12 @@ hello :-
 initialize :-
     random_seed,          %%% use current time to initialize random number generator
     blank_mark(E),
-    asserta( board([E,E,E, E,E,E, E,E,E]) )  %%% create a blank board
-    .
+    asserta(board([[E, E, E, E, E, E, E],
+                   [E, E, E, E, E, E, E],
+                   [E, E, E, E, E, E, E],
+                   [E, E, E, E, E, E, E],
+                   [E, E, E, E, E, E, E],
+                   [E, E, E, E, E, E, E]])).
 
 goodbye :-
     board(B),
@@ -205,7 +209,7 @@ human_playing(M) :-
 
 play(P) :-
     board(B), !,
-    output_board(B), !,
+    output_rows(B), !,
     not(game_over(P, B)), !,
     make_move(P, B), !,
     next_player(P, P2), !,
@@ -218,31 +222,65 @@ play(P) :-
 %.......................................
 % The mark in a square(N) corresponds to an item in a list, as follows:
 
-square([M,_,_,_,_,_,_,_,_],1,M).
-square([_,M,_,_,_,_,_,_,_],2,M).
-square([_,_,M,_,_,_,_,_,_],3,M).
-square([_,_,_,M,_,_,_,_,_],4,M).
-square([_,_,_,_,M,_,_,_,_],5,M).
-square([_,_,_,_,_,M,_,_,_],6,M).
-square([_,_,_,_,_,_,M,_,_],7,M).
-square([_,_,_,_,_,_,_,M,_],8,M).
-square([_,_,_,_,_,_,_,_,M],9,M).
+% square(Board, Row, Col, Value)
+% Récupère la valeur de la case à la ligne Row et colonne Col
+square(Board, Row, Col, Value) :-
+    nth1(Row, Board, Line),      % Récupère la ligne Row
+    nth1(Col, Line, Value).      % Récupère la colonne Col dans cette ligne
+
 
 
 %.......................................
 % win
 %.......................................
-% Players win by having their mark in one of the following square configurations:
-%
+% Players win by having their mark in one of the following square configurations
 
-win([M,M,M, _,_,_, _,_,_],M).
-win([_,_,_, M,M,M, _,_,_],M).
-win([_,_,_, _,_,_, M,M,M],M).
-win([M,_,_, M,_,_, M,_,_],M).
-win([_,M,_, _,M,_, _,M,_],M).
-win([_,_,M, _,_,M, _,_,M],M).
-win([M,_,_, _,M,_, _,_,M],M).
-win([_,_,M, _,M,_, M,_,_],M).
+win(Board, M) :-
+    member(Row, Board),          % Parcourt chaque ligne du tableau
+    consecutive_four(Row, M).    % Vérifie si 4 jetons consécutifs sont présents
+
+win(Board, M) :-
+    transpose(Board, Transposed),  % Convertit les colonnes en lignes
+    member(Column, Transposed),    % Parcourt chaque colonne (ligne transposée)
+    consecutive_four(Column, M).   % Vérifie si 4 jetons consécutifs sont présents
+
+transpose([[]|_], []) :- !.  
+transpose(Matrix, [Col|Cols]) :-
+    maplist(head_tail, Matrix, Col, RestMatrix),
+    transpose(RestMatrix, Cols).
+
+head_tail([H|T], H, T). 
+
+win(Board, M) :-
+    diagonals_desc(Board, Diagonals),
+    member(Diagonal, Diagonals),
+    consecutive_four(Diagonal, M).
+
+win(Board, M) :-
+    diagonals_asc(Board, Diagonals),
+    member(Diagonal, Diagonals),
+    consecutive_four(Diagonal, M).
+
+diagonals_desc(Board, Diagonals) :-
+    findall(D, diagonal_desc(Board, D), Diagonals).
+
+diagonal_desc(Board, Diagonal) :-
+    nth1(RowIndex, Board, Row),
+    nth1(ColIndex, Row, _),
+    extract_diagonal_desc(Board, RowIndex, ColIndex, Diagonal).
+
+extract_diagonal_desc(_, RowIndex, ColIndex, []) :-
+    RowIndex > 6 ; ColIndex > 7, !.  % Hors limites
+extract_diagonal_desc(Board, RowIndex, ColIndex, [Elem|Diagonal]) :-
+    nth1(RowIndex, Board, Row),
+    nth1(ColIndex, Row, Elem),
+    NextRow is RowIndex + 1,
+    NextCol is ColIndex + 1,
+    extract_diagonal_desc(Board, NextRow, NextCol, Diagonal).
+
+
+consecutive_four(List, M) :-
+    append(_, [M, M, M, M | _], List).
 
 
 %.......................................
@@ -286,33 +324,30 @@ game_over2(P, B) :-
 
 make_move(P, B) :-
     player(P, Type),
+    make_move2(Type, P, B, B2),  
+    retract(board(_)),           
+    asserta(board(B2)).
 
-    make_move2(Type, P, B, B2),
-
-    retract( board(_) ),
-    asserta( board(B2) )
-    .
 
 make_move2(human, P, B, B2) :-
     nl,
     nl,
     write('Player '),
     write(P),
-    write(' move? '),
-    read(S),
+    write(', select a column (1-7): '),
+    read(Col),
 
-    blank_mark(E),
-    square(B, S, E),
-    player_mark(P, M),
-    move(B, S, M, B2), !
-    .
+    valid_column(B, Col),                
+    player_mark(P, M),                   
+    insert_in_column(B, Col, M, B2),
+    !.
 
-make_move2(human, P, B, B2) :-
+make_move2(human, P, B, B2) :-           
     nl,
     nl,
-    write('Please select a numbered square.'),
-    make_move2(human,P,B,B2)
-    .
+    write('Invalid column. Please select a valid column.'),
+    make_move2(human, P, B, B2).
+
 
 make_move2(computer, P, B, B2) :-
     nl,
@@ -338,13 +373,25 @@ make_move2(computer, P, B, B2) :-
 % retrieves a list of available moves (empty squares) on a board.
 %
 
-moves(B,L) :-
-    not(win(B,x)),                %%% if either player already won, then there are no available moves
-    not(win(B,o)),
-    blank_mark(E),
-    findall(N, square(B,N,E), L), 
-    L \= []
-    .
+move(Board, Col, PlayerMark, NewBoard) :-
+    insert_in_column(Board, Col, PlayerMark, NewBoard).
+
+insert_in_column(Board, ColIndex, PlayerMark, NewBoard) :-
+    reverse(Board, ReversedBoard),  % Commence par le bas (ligne 6 -> ligne 1)
+    insert_in_column_reversed(ReversedBoard, ColIndex, PlayerMark, UpdatedReversed),
+    reverse(UpdatedReversed, NewBoard).
+
+insert_in_column_reversed([Row | Rest], ColIndex, PlayerMark, [UpdatedRow | Rest]) :-
+    nth1(ColIndex, Row, e),              % Trouve la première case vide
+    set_item(Row, ColIndex, PlayerMark, UpdatedRow). % Insère la marque
+insert_in_column_reversed([Row | Rest], ColIndex, PlayerMark, [Row | UpdatedRest]) :-
+    insert_in_column_reversed(Rest, ColIndex, PlayerMark, UpdatedRest).
+
+set_item([_ | Rest], 1, Value, [Value | Rest]).
+set_item([X | Rest], Index, Value, [X | UpdatedRest]) :-
+    Index > 1,
+    NextIndex is Index - 1,
+    set_item(Rest, NextIndex, Value, UpdatedRest).
 
 
 %.......................................
@@ -352,6 +399,12 @@ moves(B,L) :-
 %.......................................
 % determines the value of a given board position
 %
+
+valid_column(Board, Col) :-
+    Col >= 1,
+    Col =< 7,
+    nth1(1, Board, FirstRow),   
+    nth1(Col, FirstRow, e).    
 
 utility(B,U) :-
     win(B,'x'),
@@ -496,6 +549,7 @@ better2(D,R,M,S1,U1,S2,U2,  S,U) :-
 %%% OUTPUT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 output_players :- 
     nl,
     player(1, V1),
@@ -511,13 +565,13 @@ output_players :-
 
 
 output_winner(B) :-
-    win(B,x),
+    win(B, x),
     write('X wins.'),
     !
     .
 
 output_winner(B) :-
-    win(B,o),
+    win(B, o),
     write('O wins.'),
     !
     .
@@ -527,54 +581,53 @@ output_winner(B) :-
     .
 
 
-output_board(B) :-
-    nl,
-    nl,
-    output_square(B,1),
-    write('|'),
-    output_square(B,2),
-    write('|'),
-    output_square(B,3),
-    nl,
-    write('-----------'),
-    nl,
-    output_square(B,4),
-    write('|'),
-    output_square(B,5),
-    write('|'),
-    output_square(B,6),
-    nl,
-    write('-----------'),
-    nl,
-    output_square(B,7),
-    write('|'),
-    output_square(B,8),
-    write('|'),
-    output_square(B,9), !
-    .
-
 output_board :-
-    board(B),
-    output_board(B), !
-    .
+    nl,
+    output_column_indices,  % Afficher les indices des colonnes
+    board(Board),
+    nl,
+    output_rows(Board).      % Afficher les lignes
 
-output_square(B,S) :-
-    square(B,S,M),
+
+output_column_indices :-
+    write('  1   2   3   4   5   6   7'), nl.
+
+
+output_rows([]) :- nl.  
+output_rows([Row | Rest]) :-
+    output_row(Row), nl,      % Afficher chaque ligne
+    output_rows(Rest).        % Passer à la suivante
+
+
+output_row(Row) :-
+    write('|'),
+    output_cells(Row).        % Afficher chaque cellule de la ligne
+
+
+output_cells([]).             % Fin de la ligne
+output_cells([Cell | Rest]) :-
+    write(' '), write(Cell), write(' |'),  % Affiche la cellule et un séparateur
+    output_cells(Rest).
+
+
+output_square(B, S) :-
+    square(B, S, M),
     write(' '), 
-    output_square2(S,M),  
+    output_square2(S, M),  
     write(' '), !
     .
 
 output_square2(S, E) :- 
     blank_mark(E),
-    write(S), !              %%% if square is empty, output the square number
+    write(S), !              %%% Si la case est vide, afficher son index
     .
 
 output_square2(S, M) :- 
-    write(M), !              %%% if square is marked, output the mark
+    write(M), !              %%% Si la case est marquée, afficher la marque
     .
 
-output_value(D,S,U) :-
+
+output_value(D, S, U) :-
     D == 1,
     nl,
     write('Square '),
@@ -583,10 +636,8 @@ output_value(D,S,U) :-
     write(U), !
     .
 
-output_value(D,S,U) :- 
-    true
-    .
-
+output_value(D, S, U) :- 
+    true.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
