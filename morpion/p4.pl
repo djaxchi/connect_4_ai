@@ -85,7 +85,9 @@ corner_square(3, 7).
 corner_square(4, 9).
 
 
-
+my_member(X, [X|_]).  % Pas de coupure ici
+my_member(X, [_|T]) :-
+    my_member(X, T).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%     MAIN PROGRAM
@@ -111,12 +113,13 @@ hello :-
     nl,
     nl,
     nl,
-    write('Welcome to Tic-Tac-Toe.'),
+    write('Welcome to Connect-4!'),
     read_players,
     output_players
     .
 
 initialize :-
+    retractall(board(_)), 
     random_seed,          %%% use current time to initialize random number generator
     blank_mark(E),
     asserta(board([[E, E, E, E, E, E, E],
@@ -207,14 +210,150 @@ human_playing(M) :-
     .
 
 
+
+% Lancer une série de tests
+test :-
+    test_initialize,
+    test_play,
+    test_win_conditions,
+    test_board_full,
+    write('All tests passed!'), nl.
+
+% Test : Initialisation du tableau
+test_initialize :-
+    initialize,
+    board(B),
+    write('Testing board initialization...'), nl,
+    output_board, % Affiche le tableau initial
+    blank_mark(E),
+    forall(member(Row, B), forall(member(Cell, Row), Cell = E)), % Vérifie que toutes les cases sont vides
+    write('Board initialized successfully.'), nl.
+
+% Test : Simuler une partie de jeu
+test_play :-
+    write('Testing game play simulation...'), nl,
+    initialize,
+    play_test_moves([[1, x], [2, o], [1, x], [2, o], [1, x], [2, o], [1, x]]), % Simule des coups
+    board(B),
+    output_rows(B), % Affiche l'état du tableau après les mouvements
+    win(B, x), % Vérifie si le joueur x a gagné
+    write('Game play simulation successful.'), nl.
+
+% Test : Conditions de victoire
+test_win_conditions :-
+    write('Testing win conditions...'), nl,
+    board_empty(B),
+    test_horizontal_win(B),
+    test_vertical_win(B),
+    test_diagonal_win(B),
+    write('Win conditions passed.'), nl.
+
+% Test : Plateau plein
+test_board_full :-
+    write('Testing board full condition...'), nl,
+    full_board(B),
+    board(B),
+    is_board_full(B),
+    write('Board full test passed.'), nl.
+
+% Tests spécifiques : Victoire horizontale
+test_horizontal_win(B) :-
+    write('Testing horizontal win...'), nl,
+    set_horizontal_win(B, x, NewBoard), % Place une victoire horizontale pour x
+    board(NewBoard),
+    win(NewBoard, x),
+    write('Horizontal win test passed.'), nl.
+
+% Tests spécifiques : Victoire verticale
+test_vertical_win(B) :-
+    write('Testing vertical win...'), nl,
+    set_vertical_win(B, o, NewBoard), % Place une victoire verticale pour o
+    board(NewBoard),
+    win(NewBoard, o),
+    write('Vertical win test passed.'), nl.
+
+% Tests spécifiques : Victoire diagonale
+test_diagonal_win(B) :-
+    write('Testing diagonal win...'), nl,
+    set_diagonal_win(B, x, NewBoard), % Place une victoire diagonale pour x
+    board(NewBoard),
+    win(NewBoard, x),
+    write('Diagonal win test passed.'), nl.
+
+% Initialisation d'un tableau vide
+board_empty([[e, e, e, e, e, e, e],
+             [e, e, e, e, e, e, e],
+             [e, e, e, e, e, e, e],
+             [e, e, e, e, e, e, e],
+             [e, e, e, e, e, e, e],
+             [e, e, e, e, e, e, e]]).
+
+% Plateau plein pour test
+full_board([[x, o, x, o, x, o, x],
+            [o, x, o, x, o, x, o],
+            [x, o, x, o, x, o, x],
+            [o, x, o, x, o, x, o],
+            [x, o, x, o, x, o, x],
+            [o, x, o, x, o, x, o]]).
+
+% Place une victoire horizontale
+set_horizontal_win(Board, Mark, NewBoard) :-
+    board_empty(Board),
+    replace_row(Board, 6, [Mark, Mark, Mark, Mark, e, e, e], NewBoard).
+
+% Place une victoire verticale
+set_vertical_win(Board, Mark, NewBoard) :-
+    board_empty(Board),
+    replace_column(Board, 1, [Mark, Mark, Mark, Mark, e, e], NewBoard).
+
+% Place une victoire diagonale
+set_diagonal_win(Board, Mark, NewBoard) :-
+    board_empty(Board),
+    replace_diagonal(Board, Mark, NewBoard).
+
+% Remplace une ligne
+replace_row(Board, RowIdx, NewRow, NewBoard) :-
+    nth1(RowIdx, Board, _, Rest),
+    nth1(RowIdx, NewBoard, NewRow, Rest).
+
+% Remplace une colonne
+replace_column(Board, ColIdx, NewColumn, NewBoard) :-
+    transpose(Board, Transposed),
+    replace_row(Transposed, ColIdx, NewColumn, NewTransposed),
+    transpose(NewTransposed, NewBoard).
+
+% Remplace une diagonale
+replace_diagonal(Board, Mark, NewBoard) :-
+    board_empty(Board),
+    NewBoard = [[Mark, e, e, e, e, e, e],
+                [e, Mark, e, e, e, e, e],
+                [e, e, Mark, e, e, e, e],
+                [e, e, e, Mark, e, e, e],
+                [e, e, e, e, e, e, e],
+                [e, e, e, e, e, e, e]].
+
+% Simulation de coups
+play_test_moves([]).
+play_test_moves([[Col, Mark] | Rest]) :-
+    board(B),
+    insert_in_column(B, Col, Mark, NewBoard),
+    retract(board(_)),
+    asserta(board(NewBoard)),
+    play_test_moves(Rest).
+
+
+
 play(P) :-
     board(B), !,
-    output_rows(B), !,
-    not(game_over(P, B)), !,
-    make_move(P, B), !,
-    next_player(P, P2), !,
-    play(P2), !
-    .
+    write('Current player: '), write(P), nl,
+    output_board, !,
+    (not(game_over(P, B)) ->
+        (make_move(P, B), !,
+         next_player(P, P2), !,
+         play(P2))
+    ;
+        write('Game over!'), nl).
+
 
 
 %.......................................
@@ -228,15 +367,14 @@ square(Board, Row, Col, Value) :-
     nth1(Row, Board, Line),      % Récupère la ligne Row
     nth1(Col, Line, Value).      % Récupère la colonne Col dans cette ligne
 
-
-
 %.......................................
 % win
 %.......................................
 % Players win by having their mark in one of the following square configurations
 
 win(Board, M) :-
-    member(Row, Board),          % Parcourt chaque ligne du tableau
+    member(Row, Board),  
+    write('Row: '), write(Row), nl,
     consecutive_four(Row, M).    % Vérifie si 4 jetons consécutifs sont présents
 
 win(Board, M) :-
@@ -304,6 +442,10 @@ game_over(P, B) :-
     game_over2(P, B)
     .
 
+game_over2(_, Board) :-
+    is_board_full(Board).
+
+
 game_over2(P, B) :-
     opponent_mark(P, M),   %%% game is over if opponent wins
     win(B, M)
@@ -313,6 +455,13 @@ game_over2(P, B) :-
     blank_mark(E),
     not(square(B,S,E))     %%% game is over if opponent wins
     .
+
+% Vérifie si le tableau est plein (aucune case vide)
+is_board_full(Board) :-
+    is_list(Board),
+    forall(member(Row, Board), is_list(Row)),  % Vérifie que chaque ligne est une liste
+    blank_mark(E),
+    \+ (member(Row, Board), member(E, Row)).  % Vérifie l'absence de cases vides
 
 
 %.......................................
@@ -555,11 +704,14 @@ output_players :-
     player(1, V1),
     write('Player 1 is '),   %%% either human or computer
     write(V1),
+    nl,
 
     nl,
     player(2, V2),
     write('Player 2 is '),   %%% either human or computer
     write(V2), 
+    nl,
+    nl,
     !
     .
 
