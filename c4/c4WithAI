@@ -1,15 +1,19 @@
 % Initialise un plateau vide
-init_board([[e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e]]).
+init_board(Board) :-
+    Board = [[e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e]].
 
 % Affiche le plateau
 display_board(Board) :-
+    transpose(Board, DisplayableBoard),
     nl, write('  1   2   3   4   5   6   7'), nl,
-    maplist(display_row, Board), nl.
+    maplist(display_row, DisplayableBoard), nl.
+
 
 display_row(Row) :-
     write('|'),
@@ -17,16 +21,17 @@ display_row(Row) :-
     nl.
 
 display_cell(Cell) :-
-    (Cell = e -> write('   '); write(' '), write(Cell), write(' ')),
+    (Cell = e -> write(' e '); write(' '), write(Cell), write(' ')),
     write('|').
 
 % Insère un jeton dans une colonne
 insert_in_column(Board, Col, Mark, NewBoard) :-
-    nth1(Col, Board, Column),
-    reverse(Column, ReversedColumn),
+    nth1(Col, Board, Column), % Récupérer la colonne spécifiée
+    reverse(Column, ReversedColumn), % Commencer par le bas
     replace_first_empty(ReversedColumn, Mark, UpdatedReversedColumn),
-    reverse(UpdatedReversedColumn, UpdatedColumn),
-    replace_column(Board, Col, UpdatedColumn, NewBoard).
+    reverse(UpdatedReversedColumn, UpdatedColumn), % Restaurer l'ordre
+    replace_column(Board, Col, UpdatedColumn, NewBoard). % Mettre à jour la colonne
+
 
 replace_first_empty([e|Rest], Mark, [Mark|Rest]).
 replace_first_empty([Cell|Rest], Mark, [Cell|UpdatedRest]) :-
@@ -81,130 +86,67 @@ consecutive_four(List, Mark) :-
 
 % Vérifie si une colonne est valide
 valid_column(Board, Col) :-
-    nonvar(Board),                             % Vérifie que `Board` est instancié
-    between(1, 7, Col),                        % Génère les colonnes valides (1 à 7)
-    nth1(1, Board, TopRow),                    % Récupère la première ligne
-    nth1(Col, TopRow, e).                      % Vérifie si la colonne n'est pas pleine
+    nonvar(Board),                         % Vérifie que le plateau est instancié
+    between(1, 7, Col),                    % Génère les colonnes valides (1 à 7)
+    nth1(Col, Board, Column),              % Récupère la colonne correspondante
+    member(e, Column).                     % Vérifie s'il y a une case vide dans la colonne
 
-% Permet à l'IA de choisir le meilleur mouvement.
-ai_move(Board, Player, NewBoard) :-
-    Depth = 5,  % Ajustez la profondeur en fonction de la performance souhaitée
-    minimax(Board, Player, -1000, 1000, _BestScore, BestMove, Depth),
-    insert_in_column(Board, BestMove, Player, NewBoard).
-
-% Implémente l'algorithme Minimax avec élagage alpha-bêta pour explorer les coups possibles.
-minimax(Board, Player, Alpha, Beta, BestScore, BestMove, Depth) :-
-    (   Depth =< 0
-    ->  utility(Board, Player, BestScore), BestMove = 0   % Évaluation statique à la profondeur maximale
-    ;   findall(Col, valid_column(Board, Col), ValidMoves),
-        (   ValidMoves = []
-        ->  BestScore = 0, BestMove = 0                  % Aucun coup possible -> état neutre
-        ;   NewDepth is Depth - 1,
-            evaluate_moves(Board, Player, ValidMoves, Alpha, Beta, BestScore, BestMove, NewDepth)
-        )
-    ).
-
-% Évalue tous les mouvements possibles pour déterminer le meilleur.
-evaluate_moves(Board, Player, [Move|Moves], Alpha, Beta, BestScore, BestMove, Depth) :-
-    insert_in_column(Board, Move, Player, NewBoard),          % Simule le coup
-    (   win(NewBoard, Player)                                % Si le coup est gagnant
-    ->  BestScore = 1000, BestMove = Move
-    ;   next_player(Player, Opponent),                       % Change de joueur
-        minimax(NewBoard, Opponent, Alpha, Beta, OppScore, _, Depth), % Évalue le score adverse
-        Score is -OppScore,                                   % Inverse le score pour Minimax
-        update_alpha_beta(Move, Score, Alpha, Beta, Moves, Player, BestScore, BestMove, Depth)
-    ).
-
-% Met à jour les valeurs alpha et bêta, en permettant l'élagage.
-update_alpha_beta(Move, Score, Alpha, Beta, Moves, Player, BestScore, BestMove, Depth) :-
-    (   Score >= Beta                                        % Élagage bêta : l'adversaire évitera cette branche
-    ->  BestScore = Score, BestMove = Move
-    ;   NewAlpha is max(Alpha, Score),
-        (   Moves = []
-        ->  BestScore = Score, BestMove = Move              % Aucun mouvement restant
-        ;   evaluate_moves(Board, Player, Moves, NewAlpha, Beta, TempScore, TempMove, Depth),
-            (   Score > TempScore
-            ->  BestScore = Score, BestMove = Move
-            ;   BestScore = TempScore, BestMove = TempMove
-            )
-        )
-    ).
-
-% Donne une valeur à l'état actuel du plateau (pour gagner, perdre ou état neutre).
-utility(Board, Player, Score) :-
-    (   win(Board, Player)
-    ->  Score = 1000                     % Coup gagnant pour l'IA
-    ;   next_player(Player, Opponent),
-        (   win(Board, Opponent)
-        ->  Score = -1000                % Coup gagnant pour l'adversaire
-        ;   evaluate_board(Board, Player, Opponent, Score) % Évaluation intermédiaire
-        )
-    ).
-
-evaluate_board(Board, Player, Opponent, Score) :-
-    count_alignments(Board, Player, PlayerCount),            % Alignements pour l'IA
-    count_alignments(Board, Opponent, OpponentCount),        % Alignements pour l'adversaire
-    Score is PlayerCount - OpponentCount.                    % Différence des alignements
-
-count_alignments(Board, Player, Count) :-
-    findall(1, potential_alignment(Board, Player), Alignments),
-    length(Alignments, Count).
-
-potential_alignment(Board, Player) :-
-    (   horizontal_alignment(Board, Player)
-    ;   vertical_alignment(Board, Player)
-    ;   diagonal_alignment(Board, Player)
-    ).
-
-horizontal_alignment(Board, Player) :-
-    member(Row, Board),
-    append(_, [Player, Player, Player, e|_], Row). % 3 alignés + une case libre
-
-vertical_alignment(Board, Player) :-
-    transpose(Board, Transposed),
-    horizontal_alignment(Transposed, Player).
-
-diagonal_alignment(Board, Player) :-
-    diagonals(Board, Diagonals),
-    member(Diagonal, Diagonals),
-    append(_, [Player, Player, Player, e|_], Diagonal).
-
-% Vérifie si un coup gagnant est possible pour un joueur.
-can_win_next(Board, Player) :-
-    valid_column(Board, Col),
-    insert_in_column(Board, Col, Player, NewBoard),
-    win(NewBoard, Player).
 
 % Boucle principale
 play :-
+    write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard): '),
+    read(Difficulty),
     init_board(Board),
     display_board(Board),
-    play_turn(Board, x). % Le joueur humain commence en tant que 'x'
+    play_turn(Board, x, Difficulty). % Transmet le niveau de difficulté
+
 
 % Tour de jeu
-play_turn(Board, Player) :-
+% Tour de jeu
+play_turn(Board, Player, Difficulty) :-
     (   Player = x
-    ->  format('Player ~w, choose a column (1-7): ', [Player]), % Tour du joueur humain
+    ->  format('Player ~w, choose a column (1-7): ', [Player]),
         read(Col),
         (   valid_column(Board, Col)
-        ->  insert_in_column(Board, Col, Player, NewBoard),
+        ->  insert_in_column(Board, Col, Player, NewBoard), % Met à jour le plateau
             display_board(NewBoard),
             (   win(NewBoard, Player)
             ->  format('Player ~w wins!~n', [Player])
             ;   next_player(Player, NextPlayer),
-                play_turn(NewBoard, NextPlayer)
+                play_turn(NewBoard, NextPlayer, Difficulty) % Passe le nouveau plateau
             )
         ;   write('Invalid move. Try again.'), nl,
-            play_turn(Board, Player)
+            play_turn(Board, Player, Difficulty) % Rejoue le tour sans changer le plateau
         )
-    ;   ai_move(Board, Player, NewBoard),                      % Tour de l'IA
+    ;   ai_move(Board, Player, NewBoard, Difficulty), % L'IA joue son tour
         display_board(NewBoard),
         (   win(NewBoard, Player)
         ->  write('AI wins!~n')
         ;   next_player(Player, NextPlayer),
-            play_turn(NewBoard, NextPlayer)
+            play_turn(NewBoard, NextPlayer, Difficulty) % Passe le plateau mis à jour
         )
     ).
+
+
+% IA : Détermine le mouvement en fonction du niveau
+ai_move(Board, Player, NewBoard, 1) :- % Niveau 1 : Aléatoire
+    random_ai_move(Board, Player, NewBoard).
+ai_move(Board, Player, NewBoard, 2) :- % Niveau 2 : À implémenter
+    write('Medium AI is not implemented yet. Playing randomly.'), nl,
+    random_ai_move(Board, Player, NewBoard).
+ai_move(Board, Player, NewBoard, 3) :- % Niveau 3 : À implémenter
+    write('Hard AI is not implemented yet. Playing randomly.'), nl,
+    random_ai_move(Board, Player, NewBoard).
+
+% IA aléatoire : Joue dans une colonne valide choisie au hasard
+random_ai_move(Board, Player, NewBoard) :-
+    nonvar(Board),                                % Vérifie que `Board` est instancié
+    findall(Col, valid_column(Board, Col), ValidMoves), % Liste des colonnes valides
+    ValidMoves \= [],                             % Vérifie qu'il existe des colonnes valides
+    random_member(Col, ValidMoves),              % Choisit une colonne au hasard
+    insert_in_column(Board, Col, Player, NewBoard).
+
+
 
 % Inverse le joueur
 next_player(x, o).
