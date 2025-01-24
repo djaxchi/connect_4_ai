@@ -1,15 +1,19 @@
 % Initialise un plateau vide
-init_board([[e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e],
-            [e, e, e, e, e, e, e]]).
+init_board(Board) :-
+    Board = [[e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e],
+             [e, e, e, e, e, e]].
 
 % Affiche le plateau
 display_board(Board) :-
+    transpose(Board, DisplayableBoard),
     nl, write('  1   2   3   4   5   6   7'), nl,
-    maplist(display_row, Board), nl.
+    maplist(display_row, DisplayableBoard), nl.
+
 
 display_row(Row) :-
     write('|'),
@@ -17,16 +21,17 @@ display_row(Row) :-
     nl.
 
 display_cell(Cell) :-
-    (Cell = e -> write('   '); write(' '), write(Cell), write(' ')),
+    (Cell = e -> write(' e '); write(' '), write(Cell), write(' ')),
     write('|').
 
 % Insère un jeton dans une colonne
 insert_in_column(Board, Col, Mark, NewBoard) :-
-    nth1(Col, Board, Column),
-    reverse(Column, ReversedColumn),
+    nth1(Col, Board, Column), % Récupérer la colonne spécifiée
+    reverse(Column, ReversedColumn), % Commencer par le bas
     replace_first_empty(ReversedColumn, Mark, UpdatedReversedColumn),
-    reverse(UpdatedReversedColumn, UpdatedColumn),
-    replace_column(Board, Col, UpdatedColumn, NewBoard).
+    reverse(UpdatedReversedColumn, UpdatedColumn), % Restaurer l'ordre
+    replace_column(Board, Col, UpdatedColumn, NewBoard). % Mettre à jour la colonne
+
 
 replace_first_empty([e|Rest], Mark, [Mark|Rest]).
 replace_first_empty([Cell|Rest], Mark, [Cell|UpdatedRest]) :-
