@@ -1,0 +1,219 @@
+% Initialise un plateau vide
+init_board([[e, e, e, e, e, e, e],
+            [e, e, e, e, e, e, e],
+            [e, e, e, e, e, e, e],
+            [e, e, e, e, e, e, e],
+            [e, e, e, e, e, e, e],
+            [e, e, e, e, e, e, e]]).
+
+% Affiche le plateau
+display_board(Board) :-
+    nl, write('  1   2   3   4   5   6   7'), nl,
+    maplist(display_row, Board), nl.
+
+display_row(Row) :-
+    write('|'),
+    maplist(display_cell, Row),
+    nl.
+
+display_cell(Cell) :-
+    (Cell = e -> write('   '); write(' '), write(Cell), write(' ')),
+    write('|').
+
+% Insère un jeton dans une colonne
+insert_in_column(Board, Col, Mark, NewBoard) :-
+    nth1(Col, Board, Column),
+    reverse(Column, ReversedColumn),
+    replace_first_empty(ReversedColumn, Mark, UpdatedReversedColumn),
+    reverse(UpdatedReversedColumn, UpdatedColumn),
+    replace_column(Board, Col, UpdatedColumn, NewBoard).
+
+replace_first_empty([e|Rest], Mark, [Mark|Rest]).
+replace_first_empty([Cell|Rest], Mark, [Cell|UpdatedRest]) :-
+    replace_first_empty(Rest, Mark, UpdatedRest).
+
+replace_column([Col|Cols], 1, NewCol, [NewCol|Cols]).
+replace_column([Col|Cols], Index, NewCol, [Col|UpdatedCols]) :-
+    Index > 1,
+    NextIndex is Index - 1,
+    replace_column(Cols, NextIndex, NewCol, UpdatedCols).
+
+% Vérifie une victoire
+win(Board, Mark) :-
+    (   horizontal_win(Board, Mark)
+    ;   vertical_win(Board, Mark)
+    ;   diagonal_win(Board, Mark)
+    ).
+
+horizontal_win(Board, Mark) :-
+    member(Row, Board),
+    consecutive_four(Row, Mark).
+
+vertical_win(Board, Mark) :-
+    transpose(Board, Transposed),
+    member(Column, Transposed),
+    consecutive_four(Column, Mark).
+
+diagonal_win(Board, Mark) :-
+    diagonals(Board, Diagonals),
+    member(Diagonal, Diagonals),
+    consecutive_four(Diagonal, Mark).
+
+diagonals(Board, Diagonals) :-
+    findall(Diagonal, diagonal(Board, Diagonal), Diagonals).
+
+diagonal(Board, Diagonal) :-
+    nth1(StartRow, Board, _),
+    nth1(StartCol, [1,2,3,4,5,6,7], _),
+    extract_diagonal(Board, StartRow, StartCol, Diagonal).
+
+extract_diagonal(_, Row, Col, []) :-
+    Row < 1 ; Col < 1 ; Row > 6 ; Col > 7, !.
+extract_diagonal(Board, Row, Col, [Elem|Diagonal]) :-
+    nth1(Row, Board, Line),
+    nth1(Col, Line, Elem),
+    NextRow is Row + 1,
+    NextCol is Col + 1,
+    extract_diagonal(Board, NextRow, NextCol, Diagonal).
+
+consecutive_four(List, Mark) :-
+    append(_, [Mark, Mark, Mark, Mark|_], List).
+
+% Vérifie si une colonne est valide
+valid_column(Board, Col) :-
+    nonvar(Board),                             % Vérifie que `Board` est instancié
+    between(1, 7, Col),                        % Génère les colonnes valides (1 à 7)
+    nth1(1, Board, TopRow),                    % Récupère la première ligne
+    nth1(Col, TopRow, e).                      % Vérifie si la colonne n'est pas pleine
+
+% Permet à l'IA de choisir le meilleur mouvement.
+ai_move(Board, Player, NewBoard) :-
+    Depth = 5,  % Ajustez la profondeur en fonction de la performance souhaitée
+    minimax(Board, Player, -1000, 1000, _BestScore, BestMove, Depth),
+    insert_in_column(Board, BestMove, Player, NewBoard).
+
+% Implémente l'algorithme Minimax avec élagage alpha-bêta pour explorer les coups possibles.
+minimax(Board, Player, Alpha, Beta, BestScore, BestMove, Depth) :-
+    (   Depth =< 0
+    ->  utility(Board, Player, BestScore), BestMove = 0   % Évaluation statique à la profondeur maximale
+    ;   findall(Col, valid_column(Board, Col), ValidMoves),
+        (   ValidMoves = []
+        ->  BestScore = 0, BestMove = 0                  % Aucun coup possible -> état neutre
+        ;   NewDepth is Depth - 1,
+            evaluate_moves(Board, Player, ValidMoves, Alpha, Beta, BestScore, BestMove, NewDepth)
+        )
+    ).
+
+% Évalue tous les mouvements possibles pour déterminer le meilleur.
+evaluate_moves(Board, Player, [Move|Moves], Alpha, Beta, BestScore, BestMove, Depth) :-
+    insert_in_column(Board, Move, Player, NewBoard),          % Simule le coup
+    (   win(NewBoard, Player)                                % Si le coup est gagnant
+    ->  BestScore = 1000, BestMove = Move
+    ;   next_player(Player, Opponent),                       % Change de joueur
+        minimax(NewBoard, Opponent, Alpha, Beta, OppScore, _, Depth), % Évalue le score adverse
+        Score is -OppScore,                                   % Inverse le score pour Minimax
+        update_alpha_beta(Move, Score, Alpha, Beta, Moves, Player, BestScore, BestMove, Depth)
+    ).
+
+% Met à jour les valeurs alpha et bêta, en permettant l'élagage.
+update_alpha_beta(Move, Score, Alpha, Beta, Moves, Player, BestScore, BestMove, Depth) :-
+    (   Score >= Beta                                        % Élagage bêta : l'adversaire évitera cette branche
+    ->  BestScore = Score, BestMove = Move
+    ;   NewAlpha is max(Alpha, Score),
+        (   Moves = []
+        ->  BestScore = Score, BestMove = Move              % Aucun mouvement restant
+        ;   evaluate_moves(Board, Player, Moves, NewAlpha, Beta, TempScore, TempMove, Depth),
+            (   Score > TempScore
+            ->  BestScore = Score, BestMove = Move
+            ;   BestScore = TempScore, BestMove = TempMove
+            )
+        )
+    ).
+
+% Donne une valeur à l'état actuel du plateau (pour gagner, perdre ou état neutre).
+utility(Board, Player, Score) :-
+    (   win(Board, Player)
+    ->  Score = 1000                     % Coup gagnant pour l'IA
+    ;   next_player(Player, Opponent),
+        (   win(Board, Opponent)
+        ->  Score = -1000                % Coup gagnant pour l'adversaire
+        ;   evaluate_board(Board, Player, Opponent, Score) % Évaluation intermédiaire
+        )
+    ).
+
+evaluate_board(Board, Player, Opponent, Score) :-
+    count_alignments(Board, Player, PlayerCount),            % Alignements pour l'IA
+    count_alignments(Board, Opponent, OpponentCount),        % Alignements pour l'adversaire
+    Score is PlayerCount - OpponentCount.                    % Différence des alignements
+
+count_alignments(Board, Player, Count) :-
+    findall(1, potential_alignment(Board, Player), Alignments),
+    length(Alignments, Count).
+
+potential_alignment(Board, Player) :-
+    (   horizontal_alignment(Board, Player)
+    ;   vertical_alignment(Board, Player)
+    ;   diagonal_alignment(Board, Player)
+    ).
+
+horizontal_alignment(Board, Player) :-
+    member(Row, Board),
+    append(_, [Player, Player, Player, e|_], Row). % 3 alignés + une case libre
+
+vertical_alignment(Board, Player) :-
+    transpose(Board, Transposed),
+    horizontal_alignment(Transposed, Player).
+
+diagonal_alignment(Board, Player) :-
+    diagonals(Board, Diagonals),
+    member(Diagonal, Diagonals),
+    append(_, [Player, Player, Player, e|_], Diagonal).
+
+% Vérifie si un coup gagnant est possible pour un joueur.
+can_win_next(Board, Player) :-
+    valid_column(Board, Col),
+    insert_in_column(Board, Col, Player, NewBoard),
+    win(NewBoard, Player).
+
+% Boucle principale
+play :-
+    init_board(Board),
+    display_board(Board),
+    play_turn(Board, x). % Le joueur humain commence en tant que 'x'
+
+% Tour de jeu
+play_turn(Board, Player) :-
+    (   Player = x
+    ->  format('Player ~w, choose a column (1-7): ', [Player]), % Tour du joueur humain
+        read(Col),
+        (   valid_column(Board, Col)
+        ->  insert_in_column(Board, Col, Player, NewBoard),
+            display_board(NewBoard),
+            (   win(NewBoard, Player)
+            ->  format('Player ~w wins!~n', [Player])
+            ;   next_player(Player, NextPlayer),
+                play_turn(NewBoard, NextPlayer)
+            )
+        ;   write('Invalid move. Try again.'), nl,
+            play_turn(Board, Player)
+        )
+    ;   ai_move(Board, Player, NewBoard),                      % Tour de l'IA
+        display_board(NewBoard),
+        (   win(NewBoard, Player)
+        ->  write('AI wins!~n')
+        ;   next_player(Player, NextPlayer),
+            play_turn(NewBoard, NextPlayer)
+        )
+    ).
+
+% Inverse le joueur
+next_player(x, o).
+next_player(o, x).
+
+% Transpose une matrice
+transpose([[]|_], []) :- !.
+transpose(Matrix, [Col|Cols]) :-
+    maplist(head_tail, Matrix, Col, RestMatrix),
+    transpose(RestMatrix, Cols).
+
+head_tail([H|T], H, T).
