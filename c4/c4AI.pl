@@ -236,18 +236,45 @@ head_tail([H|T], H, T).
 % 11- ALPHA-BETA : IMPLEMENTATION
 % ---------------------------------
 
-%%% Évaluation simple :
-%%% +100000 si Board gagnant pour Player
-%%% -100000 si gagnant pour l’adversaire
-%%% 0 sinon
+%%% evaluate_board(+Board, +Player, -Score)
 evaluate_board(Board, Player, Score) :-
-    next_player(Player, Opp),
-    (   win(Board, Player)
-    ->  Score = 100000
-    ;   win(Board, Opp)
-    ->  Score = -100000
-    ;   Score = 0
+    opponent(Player, Opponent),
+    findall(S, (line(Board, L), score_line(L, Player, Opponent, S)), Scores),
+    sum_list(Scores, Score).
+
+% Get all possible lines (rows, columns, diagonals)
+line(Board, Line) :- member(Line, Board). % Rows
+line(Board, Line) :- transpose(Board, Transposed), member(Line, Transposed). % Columns
+line(Board, Line) :- diagonals_desc(Board, Diags), member(Line, Diags). % Descending diagonals
+line(Board, Line) :- diagonals_asc(Board, Diags), member(Line, Diags). % Ascending diagonals
+
+% Assign scores to a given line
+score_line(Line, Player, Opponent, Score) :-
+    (   consecutive_four(Line, Player) -> Score is 1000
+    ;   consecutive_four(Line, Opponent) -> Score is -1000
+    ;   three_in_a_row(Line, Player) -> Score is 50
+    ;   three_in_a_row(Line, Opponent) -> Score is -50
+    ;   two_in_a_row(Line, Player) -> Score is 10
+    ;   two_in_a_row(Line, Opponent) -> Score is -10
+    ;   Score is 0
     ).
+
+% Check if there are three pieces in a row with one empty spot
+three_in_a_row(Line, Player) :-
+    append(_, [Player, Player, Player, e|_], Line).
+three_in_a_row(Line, Player) :-
+    append(_, [e, Player, Player, Player|_], Line).
+
+% Check if there are two pieces in a row with two empty spots
+two_in_a_row(Line, Player) :-
+    append(_, [Player, Player, e, e|_], Line).
+two_in_a_row(Line, Player) :-
+    append(_, [e, e, Player, Player|_], Line).
+
+% Get opponent
+opponent(x, o).
+opponent(o, x).
+
 
 %%% terminal_state : vrai si état terminal OU profondeur épuisée
 terminal_state(Board, Depth, Player, Score, true) :-
