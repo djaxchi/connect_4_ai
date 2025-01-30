@@ -2,11 +2,10 @@
 %         PUISSANCE 4 avec IA Alpha-Beta            %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% ------------------------------
+% --------------------------------
 %  1- INITIALISATION DU PLATEAU
-% ------------------------------
+% --------------------------------
 
-% Initialise un plateau vide (6 lignes x 7 colonnes)
 init_board(Board) :-
     Board = [[e, e, e, e, e, e, e],
              [e, e, e, e, e, e, e],
@@ -15,9 +14,9 @@ init_board(Board) :-
              [e, e, e, e, e, e, e],
              [e, e, e, e, e, e, e]].
 
-% --------------------------------
+% -------------------------------
 %  2- AFFICHAGE DU PLATEAU
-% --------------------------------
+% -------------------------------
 
 display_board(Board) :-
     nl, write('  1   2   3   4   5   6   7'), nl,
@@ -93,7 +92,7 @@ diagonals_desc(Board, Diagonals) :-
 
 diagonal_desc(Board, Diagonal) :-
     length(Board, NumRows),
-    length(Board, NumCols),  % en réalité 7, mais on laisse flexible
+    length(Board, NumCols),
     (   between(1, NumRows, StartRow), StartCol = 1
     ;   StartRow = 1, between(2, NumCols, StartCol)
     ),
@@ -132,7 +131,6 @@ extract_diagonal_asc(Board, Row, Col, [Elem|Diagonal]) :-
 %  6- VALIDITE DE LA COLONNE + TOUR DE JEU
 % -------------------------------------
 
-% Vérifie si une colonne est valide (entre 1 et 7, et qu’elle contient au moins une case vide)
 valid_column(Board, Col) :-
     nonvar(Board),
     between(1, 7, Col),
@@ -140,7 +138,6 @@ valid_column(Board, Col) :-
     nth1(Col, Transposed, Column),
     member(e, Column).
 
-% Inverse le joueur
 next_player(x, o).
 next_player(o, x).
 
@@ -152,40 +149,31 @@ play :-
     write('How many human players? (0, 1, or 2): '),
     read(NumPlayers),
     (   NumPlayers = 0
-    ->  % IA vs IA
-        write('Difficulty for AI (X) (0: Easy, 1: Medium, 2: Hard): '),
+    ->  write('Difficulty for AI (X) (1: Easy, 2: Medium, 3: Hard, 4: Strategic): '),
         read(DifficultyX),
-        write('Difficulty for AI (O) (1: Easy, 2: Medium, 3: Hard): '),
+        write('Difficulty for AI (O) (1: Easy, 2: Medium, 3: Hard, 4: Strategic): '),
         read(DifficultyO),
         init_board(Board),
         display_board(Board),
         play_turn_2_ais(Board, x, DifficultyX, DifficultyO)
     ;   NumPlayers = 1
-    ->  % 1 joueur humain contre une IA
-        write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard, 4: Strategic AI): '),
+    ->  write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard, 4: Strategic AI): '),
         read(Difficulty),
         init_board(Board),
         display_board(Board),
         play_turn_1_human(Board, x, Difficulty)
     ;   NumPlayers = 2
-    ->  % 2 joueurs humains
-        init_board(Board),
+    ->  init_board(Board),
         display_board(Board),
         play_turn_2_humans(Board, x)
-    ;   % Sinon, entrée invalide
-        writeln('Invalid choice, please enter 0, 1, or 2.'),
+    ;   writeln('Invalid choice, please enter 0, 1, or 2.'),
         play
     ).
 
-
-% play_turn_1_human(+Board, +Player, +Difficulty)
-% Gère une partie : 
-% - Player x = Humain
-% - Player o = IA avec Difficulty
+% Tour humain vs IA
 play_turn_1_human(Board, Player, Difficulty) :-
     (   Player = x
-    ->  % Tour du joueur humain
-        format('Player ~w, choose a column (1-7): ', [x]),
+    ->  format('Player ~w, choose a column (1-7): ', [x]),
         read(Col),
         (   valid_column(Board, Col)
         ->  insert_in_column(Board, Col, x, NewBoard),
@@ -198,8 +186,7 @@ play_turn_1_human(Board, Player, Difficulty) :-
         ;   writeln('Invalid move. Try again.'),
             play_turn_1_human(Board, x, Difficulty)
         )
-    ;   % Tour de l'IA
-        ai_move(Board, o, NewBoard, Difficulty),
+    ;   ai_move(Board, o, NewBoard, Difficulty),
         display_board(NewBoard),
         (   win(NewBoard, o)
         ->  writeln('AI (O) wins!')
@@ -208,9 +195,7 @@ play_turn_1_human(Board, Player, Difficulty) :-
         )
     ).
 
-
-% play_turn_2_humans(+Board, +Player)
-% Gère une partie avec deux joueurs humains.
+% Tour 2 joueurs humains
 play_turn_2_humans(Board, Player) :-
     format('Player ~w, choose a column (1-7): ', [Player]),
     read(Col),
@@ -226,20 +211,17 @@ play_turn_2_humans(Board, Player) :-
         play_turn_2_humans(Board, Player)
     ).
 
-% play_turn_2_ais(+Board, +Player, +DifficultyX, +DifficultyO)
-% Gère une partie entre deux IA (x et o) avec deux niveaux de difficulté différents.
+% Tour IA vs IA
 play_turn_2_ais(Board, Player, DifficultyX, DifficultyO) :-
     (   Player = x
-    ->  % IA X joue avec sa difficulté
-        ai_move(Board, x, NewBoard, DifficultyX),
+    ->  ai_move(Board, x, NewBoard, DifficultyX),
         display_board(NewBoard),
         (   win(NewBoard, x)
         ->  writeln('AI (X) wins!')
         ;   next_player(x, NextPlayer),
             play_turn_2_ais(NewBoard, NextPlayer, DifficultyX, DifficultyO)
         )
-    ;   % IA O joue avec sa difficulté
-        ai_move(Board, o, NewBoard, DifficultyO),
+    ;   ai_move(Board, o, NewBoard, DifficultyO),
         display_board(NewBoard),
         (   win(NewBoard, o)
         ->  writeln('AI (O) wins!')
@@ -248,19 +230,19 @@ play_turn_2_ais(Board, Player, DifficultyX, DifficultyO) :-
         )
     ).
 
-
 % ---------------------------------
 %  8- IA : 3 NIVEAUX DE DIFFICULTÉ
 % ---------------------------------
 
 % Niveau 1 : Aléatoire
 ai_move(Board, Player, NewBoard, 1) :-
+    retractall(recorded(_, _)),    % Clear cache each move
     random_ai_move(Board, Player, NewBoard).
 
-% Niveau 2 : Medium => Alpha-Beta avec profondeur réduite (ex : 3)
+% Niveau 2 : Medium => Alpha-Beta (Depth=3) with Basic Eval
 ai_move(Board, Player, NewBoard, 2) :-
-    Depth = 3,
-    best_move_alpha_beta(Board, Player, Depth, BestCol, 0),  % 0 => "basic" evaluation
+    retractall(recorded(_, _)),
+    best_move_alpha_beta(Board, Player, 3, BestCol, 0),  % 0 => basic evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
         random_ai_move(Board, Player, NewBoard)
@@ -268,10 +250,10 @@ ai_move(Board, Player, NewBoard, 2) :-
         insert_in_column(Board, BestCol, Player, NewBoard)
     ).
 
-% Niveau 3 : Hard => Alpha-Beta avec profondeur plus élevée (ex : 5)
+% Niveau 3 : Hard => Alpha-Beta (Depth=5) with Advanced Eval
 ai_move(Board, Player, NewBoard, 3) :-
-    Depth = 3,
-    best_move_alpha_beta(Board, Player, Depth, BestCol, 1),  % 1 => "advanced" evaluation
+    retractall(recorded(_, _)),
+    best_move_alpha_beta(Board, Player, 5, BestCol, 1),  % 1 => advanced evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
         random_ai_move(Board, Player, NewBoard)
@@ -279,9 +261,10 @@ ai_move(Board, Player, NewBoard, 3) :-
         insert_in_column(Board, BestCol, Player, NewBoard)
     ).
 
+% Niveau 4 : "Strategic" => Alpha-Beta (Depth=6) with "Eval=2"
 ai_move(Board, Player, NewBoard, 4) :-
-    Depth = 3,  % Slightly deeper search for Eval=2
-    best_move_alpha_beta(Board, Player, Depth, BestCol, 2),  % 2 => New evaluation
+    retractall(recorded(_, _)),
+    best_move_alpha_beta(Board, Player, 6, BestCol, 2),  % 2 => new heuristic
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
         random_ai_move(Board, Player, NewBoard)
@@ -293,7 +276,6 @@ ai_move(Board, Player, NewBoard, 4) :-
 %  9- IA ALÉATOIRE
 % ---------------------------------
 
-% IA aléatoire : Joue dans une colonne valide choisie au hasard
 random_ai_move(Board, Player, NewBoard) :-
     findall(Col, valid_column(Board, Col), ValidMoves),
     ValidMoves \= [],
@@ -316,49 +298,47 @@ head_tail([H|T], H, T).
 % 11- ALPHA-BETA : IMPLEMENTATION
 % ---------------------------------
 
-% Two evaluations in one predicate, controlled by 'Eval' (0 or 1):
+%%% Evaluate with caching
 evaluate_board(Board, Player, Score, Eval) :-
-    (  % Basic evaluation if Eval=0
-       Eval = 0,
-       opponent(Player, Opponent),
-       findall(S, (line(Board, L), score_line(L, Player, Opponent, S)), Scores),
-       sum_list(Scores, Score)
-    ;  % Advanced evaluation if Eval=1
-       Eval = 1,
-       next_player(Player, Opponent),
-       findall(S, (
-           (member(Row, Board), score_advanced(Row, Player, Opponent, S));
-           (transpose(Board, Transposed), member(Column, Transposed), score_advanced(Column, Player, Opponent, S));
-           (diagonals_desc(Board, DescDiags), member(Diag, DescDiags), score_advanced(Diag, Player, Opponent, S));
-           (diagonals_asc(Board, AscDiags), member(Diag, AscDiags), score_advanced(Diag, Player, Opponent, S))
-       ), Scores),
-       center_bonus(Board, Player, CenterBonus),
-       sum_list(Scores, RawScore),
-       Score is RawScore + CenterBonus
-    ;  % New evaluation if Eval=2 (Center Control + Threat Prioritization)
-       Eval = 2,
-       next_player(Player, Opponent),
-       findall(S, (
-           (line(Board, L), score_new_heuristic(L, Player, Opponent, S))
-       ), Scores),
-       sum_list(Scores, RawScore),
-       position_bonus(Board, Player, PosScore),
-       Score is RawScore + PosScore
+    term_to_atom(Board, Key),  % Convert board state to a unique key
+    (   recorded(Key, Score) -> true
+    ;   compute_board_score(Board, Player, Score, Eval),
+        recorda(Key, Score)
     ).
 
-% Get all possible lines (rows, columns, diagonals)
-line(Board, Line) :- member(Line, Board). % Rows
-line(Board, Line) :-
-    transpose(Board, Transposed),
-    member(Line, Transposed). % Columns
-line(Board, Line) :-
-    diagonals_desc(Board, Diags),
-    member(Line, Diags).      % Descending diagonals
-line(Board, Line) :-
-    diagonals_asc(Board, Diags),
-    member(Line, Diags).      % Ascending diagonals
+compute_board_score(Board, Player, Score, Eval) :-
+    (   Eval = 0 -> score_basic(Board, Player, Score)
+    ;   Eval = 1 -> score_advanced(Board, Player, Score)
+    ;   Eval = 2 -> score_strategic(Board, Player, Score)
+    ).
 
-% Simple scoring for basic evaluation
+% --- Basic scoring
+score_basic(Board, Player, Score) :-
+    opponent(Player, Opponent),
+    findall(S, (line(Board, L), score_line(L, Player, Opponent, S)), Scores),
+    sum_list(Scores, Score).
+
+% --- Advanced scoring
+score_advanced(Board, Player, Score) :-
+    opponent(Player, Opponent),
+    findall(S, (line(Board, L), score_advanced_line(L, Player, Opponent, S)), Scores),
+    sum_list(Scores, Score).
+
+% --- New "Strategic" scoring
+score_strategic(Board, Player, Score) :-
+    opponent(Player, Opponent),
+    findall(S, (line(Board, L), score_new_heuristic(L, Player, Opponent, S)), Scores),
+    sum_list(Scores, RawScore),
+    position_bonus(Board, Player, PosScore),
+    Score is RawScore + PosScore.
+
+% Get all possible lines
+line(Board, Line) :- member(Line, Board).         % Rows
+line(Board, Line) :- transpose(Board, T), member(Line, T).          % Columns
+line(Board, Line) :- diagonals_desc(Board, Ds), member(Line, Ds).   % Desc diag
+line(Board, Line) :- diagonals_asc(Board, As), member(Line, As).    % Asc diag
+
+% Basic line scoring
 score_line(Line, Player, Opponent, Score) :-
     (   consecutive_four(Line, Player)   -> Score is 1000
     ;   consecutive_four(Line, Opponent) -> Score is -1000
@@ -369,24 +349,8 @@ score_line(Line, Player, Opponent, Score) :-
     ;   Score is 0
     ).
 
-% Check if there are three pieces in a row with one empty spot
-three_in_a_row(Line, Player) :-
-    append(_, [Player, Player, Player, e|_], Line).
-three_in_a_row(Line, Player) :-
-    append(_, [e, Player, Player, Player|_], Line).
-
-% Check if there are two pieces in a row with two empty spots
-two_in_a_row(Line, Player) :-
-    append(_, [Player, Player, e, e|_], Line).
-two_in_a_row(Line, Player) :-
-    append(_, [e, e, Player, Player|_], Line).
-
-% Opponent
-opponent(x, o).
-opponent(o, x).
-
-% Advanced scoring
-score_advanced(Line, Player, Opponent, Score) :-
+% Advanced line scoring
+score_advanced_line(Line, Player, Opponent, Score) :-
     (   consecutive_four(Line, Player)       -> Score is 10000
     ;   consecutive_four(Line, Opponent)     -> Score is -10000
     ;   three_in_a_row_with_space(Line, Player)   -> Score is 200
@@ -397,65 +361,64 @@ score_advanced(Line, Player, Opponent, Score) :-
     ).
 
 three_in_a_row_with_space(Line, Mark) :-
-    append(_, [Mark, Mark, Mark, e|_], Line);
-    append(_, [e, Mark, Mark, Mark|_], Line).
+    append(_, [Mark, Mark, Mark, e|_], Line)
+    ; append(_, [e, Mark, Mark, Mark|_], Line).
 
 two_in_a_row_with_space(Line, Mark) :-
-    append(_, [Mark, Mark, e, e|_], Line);
-    append(_, [e, e, Mark, Mark|_], Line).
+    append(_, [Mark, Mark, e, e|_], Line)
+    ; append(_, [e, e, Mark, Mark|_], Line).
 
-% Bonus for central column placement
+% "Strategic" line scoring
+score_new_heuristic(Line, Player, Opponent, Score) :-
+    (   consecutive_four(Line, Player)        -> Score is 1000000   % Immediate win
+    ;   consecutive_four(Line, Opponent)      -> Score is -1000000  % Must block
+    ;   append(_, [Player, Player, e, Player|_], Line) -> Score is 500    % AI fork
+    ;   append(_, [Opponent, Opponent, e, Opponent|_], Line) -> Score is -500  % Opp fork
+    ;   three_in_a_row(Line, Player) -> Score is 100
+    ;   three_in_a_row(Line, Opponent) -> Score is -200
+    ;   two_in_a_row(Line, Player) -> Score is 40
+    ;   two_in_a_row(Line, Opponent) -> Score is -50
+    ;   Score is 0
+    ).
+
+% Helper for "three in a row" & "two in a row"
+three_in_a_row(Line, Player) :-
+    append(_, [Player, Player, Player, e|_], Line)
+    ; append(_, [e, Player, Player, Player|_], Line).
+
+two_in_a_row(Line, Player) :-
+    append(_, [Player, Player, e, e|_], Line)
+    ; append(_, [e, e, Player, Player|_], Line).
+
+% Opponents
+opponent(x, o).
+opponent(o, x).
+
+% Bonus for central column
 center_bonus(Board, Player, Bonus) :-
-    % Summation of each row's center cell, or a simpler approach:
     findall(1,
         (member(Row, Board), nth1(4, Row, Cell), Cell == Player),
         Centers),
     length(Centers, Count),
-    % e.g. +30 per piece in the center column
     Bonus is 30 * Count.
 
-score_new_heuristic(Line, Player, Opponent, Score) :-
-    (   consecutive_four(Line, Player) -> Score is 1000000  % Immediate win
-    ;   consecutive_four(Line, Opponent) -> Score is -1000000  % Block loss
-    ;   append(_, [Player, Player, e, Player|_], Line) -> Score is 500  % AI fork setup
-    ;   append(_, [Opponent, Opponent, e, Opponent|_], Line) -> Score is -500  % Opponent fork setup
-    ;   three_in_a_row(Line, Player) -> Score is 100  % Near-win
-    ;   three_in_a_row(Line, Opponent) -> Score is -200  % Blocking is more important
-    ;   two_in_a_row(Line, Player) -> Score is 40  % Strong setup
-    ;   two_in_a_row(Line, Opponent) -> Score is -50  % Stop opponent setup
-    ;   Score is 0
-    ).
-
-% Center columns are more valuable
-position_value(4, 3).  % Center column (best spot)
-position_value(3, 2).  % Slightly valuable
+% position_value for each column
+position_value(4, 3).  % center
+position_value(3, 2).
 position_value(5, 2).
-position_value(2, 1).  % Less valuable
+position_value(2, 1).
 position_value(6, 1).
-position_value(1, 0).  % Edge (least valuable)
+position_value(1, 0).
 position_value(7, 0).
 
-% Calculate position bonus
 position_bonus(Board, Player, Score) :-
     transpose(Board, Transposed),
     findall(PosValue, (
         nth1(Col, Transposed, Column),
-        nth1(Row, Column, Player),  % Find player's pieces
+        nth1(_Row, Column, Player),
         position_value(Col, PosValue)
     ), PosScores),
     sum_list(PosScores, Score).
-
-
-% terminal_state : vrai si état terminal OU profondeur épuisée
-terminal_state(Board, Depth, Player, Score, true, Eval) :-
-    (   win(Board, x)
-    ;   win(Board, o)
-    ;   Depth =< 0
-    ), !,
-    evaluate_board(Board, Player, Score, Eval).
-
-terminal_state(_, Depth, _, _, false, _) :-
-    Depth > 0.
 
 % alpha_beta(+Board, +Depth, +Alpha, +Beta, +Player, -Score, +Eval)
 alpha_beta(Board, Depth, Alpha, Beta, Player, Score, Eval) :-
@@ -464,13 +427,13 @@ alpha_beta(Board, Depth, Alpha, Beta, Player, Score, Eval) :-
     ->  Score = Val
     ;   findall(Col, valid_column(Board, Col), Moves),
         (   Moves = []
-        ->  % pas de coups => plateau plein => match nul ?
-            evaluate_board(Board, Player, Score, Eval)
-        ;   alpha_beta_loop(Moves, Board, Depth, Alpha, Beta, Player, Score, Eval)
+        ->  evaluate_board(Board, Player, Score, Eval)  % Plateau plein => match nul ?
+        ;   % [Optional] Move Ordering can be done here:
+            % order_moves(Board, Moves, Player, OrderedMoves, Eval), 
+            alpha_beta_loop(Moves, Board, Depth, Alpha, Beta, Player, Score, Eval)
         )
     ).
 
-% Parcours des coups valides (NegaMax + élagage)
 alpha_beta_loop([], _, _, Alpha, _, _, Alpha, _).
 alpha_beta_loop([Move|Moves], Board, Depth, Alpha, Beta, Player, BestScore, Eval) :-
     insert_in_column(Board, Move, Player, NewBoard),
@@ -484,7 +447,6 @@ alpha_beta_loop([Move|Moves], Board, Depth, Alpha, Beta, Player, BestScore, Eval
         alpha_beta_loop(Moves, Board, Depth, NewAlpha, Beta, Player, BestScore, Eval)
     ).
 
-% Sélection du meilleur coup
 best_move_alpha_beta(Board, Player, Depth, BestCol, Eval) :-
     findall(Col, valid_column(Board, Col), ValidMoves),
     (   ValidMoves = []
@@ -492,7 +454,6 @@ best_move_alpha_beta(Board, Player, Depth, BestCol, Eval) :-
     ;   best_move_loop(ValidMoves, Board, Player, Depth, -100000, nil, BestCol, Eval)
     ).
 
-% best_move_loop/8 : on teste chaque coup, on garde le meilleur
 best_move_loop([], _, _, _, _, ColAcc, ColAcc, _).
 best_move_loop([Move|Moves], Board, Player, Depth, BestScoreSoFar, BestColSoFar, BestCol, Eval) :-
     insert_in_column(Board, Move, Player, NewBoard),
@@ -507,3 +468,14 @@ best_move_loop([Move|Moves], Board, Player, Depth, BestScoreSoFar, BestColSoFar,
         NewBestCol   = BestColSoFar
     ),
     best_move_loop(Moves, Board, Player, Depth, NewBestScore, NewBestCol, BestCol, Eval).
+
+% terminal_state : vrai si état terminal ou profondeur épuisée
+terminal_state(Board, Depth, Player, Score, true, Eval) :-
+    (   win(Board, x)
+    ;   win(Board, o)
+    ;   Depth =< 0
+    ), !,
+    evaluate_board(Board, Player, Score, Eval).
+
+terminal_state(_, Depth, _, _, false, _) :-
+    Depth > 0.
