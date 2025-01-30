@@ -111,9 +111,10 @@ consecutive_four(List, Mark) :-
 
 % Vérifie si une colonne est valide
 valid_column(Board, Col) :-
-    nonvar(Board),                         % Vérifie que le plateau est instancié
+    transpose(Board, TransposedBoard),
+    nonvar(TransposedBoard),                         % Vérifie que le plateau est instancié
     between(1, 7, Col),                    % Génère les colonnes valides (1 à 7)
-    nth1(Col, Board, Column),              % Récupère la colonne correspondante
+    nth1(Col, TransposedBoard, Column),              % Récupère la colonne correspondante
     member(e, Column).                     % Vérifie s'il y a une case vide dans la colonne
 
 % Boucle principale

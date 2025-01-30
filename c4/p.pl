@@ -180,6 +180,67 @@ random_ai_move(Board, Player, NewBoard) :-
     random_member(Col, ValidMoves),              % Choisit une colonne au hasard
     insert_in_column(Board, Col, Player, NewBoard).
 
+% Minimax function (Depth can be added later)
+minimax(Board, Player, BestMove) :-
+    findall(Col, valid_column(Board, Col), ValidMoves), % Get all possible moves
+    best_move(Board, ValidMoves, Player, BestMove, _).
+
+% Evaluate all moves and select the best one
+best_move(Board, [Col|Cols], Player, BestCol, BestScore) :-
+    insert_in_column(Board, Col, Player, NewBoard),
+    opponent(Player, Opponent),
+    utility(NewBoard, Player, Score), % Evaluate the board using our function
+    best_move(Board, Cols, Player, Col, Score, BestCol, BestScore).
+
+% Base case: No more moves to check
+best_move(_, [], _, BestCol, BestScore, BestCol, BestScore).
+
+% Compare scores to find the best move
+best_move(Board, [Col|Cols], Player, CurrBestCol, CurrBestScore, BestCol, BestScore) :-
+    insert_in_column(Board, Col, Player, NewBoard),
+    opponent(Player, Opponent),
+    utility(NewBoard, Player, Score),
+    (Score > CurrBestScore -> best_move(Board, Cols, Player, Col, Score, BestCol, BestScore)
+    ; best_move(Board, Cols, Player, CurrBestCol, CurrBestScore, BestCol, BestScore)).
+
+% Utility function to evaluate board state
+utility(Board, Player, Score) :-
+    opponent(Player, Opponent),
+    findall(S, (line(Board, L), score_line(L, Player, Opponent, S)), Scores),
+    sum_list(Scores, Score).
+
+% Get all possible lines (rows, columns, diagonals)
+line(Board, Line) :- member(Line, Board). % Rows
+line(Board, Line) :- transpose(Board, Transposed), member(Line, Transposed). % Columns
+line(Board, Line) :- diagonals_desc(Board, Diags), member(Line, Diags). % Descending diagonals
+line(Board, Line) :- diagonals_asc(Board, Diags), member(Line, Diags). % Ascending diagonals
+
+% Assign scores to a given line
+score_line(Line, Player, Opponent, Score) :-
+    (   consecutive_four(Line, Player) -> Score is 1000
+    ;   consecutive_four(Line, Opponent) -> Score is -1000
+    ;   three_in_a_row(Line, Player) -> Score is 50
+    ;   three_in_a_row(Line, Opponent) -> Score is -50
+    ;   two_in_a_row(Line, Player) -> Score is 10
+    ;   two_in_a_row(Line, Opponent) -> Score is -10
+    ;   Score is 0
+    ).
+
+% Check if there are three pieces in a row with one empty spot
+three_in_a_row(Line, Player) :-
+    append(_, [Player, Player, Player, e|_], Line).
+three_in_a_row(Line, Player) :-
+    append(_, [e, Player, Player, Player|_], Line).
+
+% Check if there are two pieces in a row with two empty spots
+two_in_a_row(Line, Player) :-
+    append(_, [Player, Player, e, e|_], Line).
+two_in_a_row(Line, Player) :-
+    append(_, [e, e, Player, Player|_], Line).
+
+% Get opponent
+opponent(x, o).
+opponent(o, x).
 
 % Inverse le joueur
 next_player(x, o).
