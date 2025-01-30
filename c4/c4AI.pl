@@ -192,23 +192,29 @@ ai_move(Board, Player, NewBoard, 1) :-
 ai_move(Board, Player, NewBoard, 2) :-
     Depth = 3,
     best_move_alpha_beta(Board, Player, Depth, BestCol),
+    % si on a trouvé un coup (BestCol \= nil), on l'insère
+    % sinon on joue au hasard
     (   BestCol == nil
-    ->  % Si aucun coup valide (théoriquement plateau plein),
-        % on joue au hasard pour ne pas planter.
-        write('No valid moves! Playing randomly.'), nl,
+    ->  write('No valid moves! Playing randomly.'), nl,
         random_ai_move(Board, Player, NewBoard)
-    ;   insert_in_column(Board, BestCol, Player, NewBoard)
+    ;   format('AI chose column ~d~n', [BestCol]),   % <--- ICI
+        insert_in_column(Board, BestCol, Player, NewBoard)
     ).
+
 
 % Niveau 3 : Hard => Alpha-Beta avec profondeur plus élevée (ex : 5)
 ai_move(Board, Player, NewBoard, 3) :-
     Depth = 5,
     best_move_alpha_beta(Board, Player, Depth, BestCol),
+    % si on a trouvé un coup (BestCol \= nil), on l'insère
+    % sinon on joue au hasard
     (   BestCol == nil
     ->  write('No valid moves! Playing randomly.'), nl,
         random_ai_move(Board, Player, NewBoard)
-    ;   insert_in_column(Board, BestCol, Player, NewBoard)
+    ;   format('AI chose column ~d~n', [BestCol]),   % <--- ICI
+        insert_in_column(Board, BestCol, Player, NewBoard)
     ).
+
 
 % ---------------------------------
 %  9- IA ALÉATOIRE
@@ -219,7 +225,9 @@ random_ai_move(Board, Player, NewBoard) :-
     findall(Col, valid_column(Board, Col), ValidMoves),
     ValidMoves \= [],
     random_member(Col, ValidMoves),
+    format('AI chose column ~d~n', [Col]),       % <--- ICI
     insert_in_column(Board, Col, Player, NewBoard).
+
 
 % ---------------------------------
 % 10- TRANSPOSE (utile un peu partout)
