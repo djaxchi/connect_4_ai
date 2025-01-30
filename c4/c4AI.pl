@@ -191,7 +191,8 @@ play_turn_1_human(Board, Player, Difficulty) :-
         ->  insert_in_column(Board, Col, x, NewBoard),
             display_board(NewBoard),
             (   win(NewBoard, x)
-            ->  writeln('Player X wins!')
+            ->  writeln('Player X wins!'),
+                ask_replay_oneAI(Difficulty)
             ;   next_player(x, NextPlayer),
                 play_turn_1_human(NewBoard, NextPlayer, Difficulty)
             )
@@ -202,7 +203,8 @@ play_turn_1_human(Board, Player, Difficulty) :-
         ai_move(Board, o, NewBoard, Difficulty),
         display_board(NewBoard),
         (   win(NewBoard, o)
-        ->  writeln('AI (O) wins!')
+        ->  writeln('AI (O) wins!'),
+            ask_replay_oneAI(Difficulty)
         ;   next_player(o, NextPlayer),
             play_turn_1_human(NewBoard, NextPlayer, Difficulty)
         )
@@ -219,7 +221,8 @@ play_turn_2_humans(Board, Player) :-
     ->  insert_in_column(Board, Col, Player, NewBoard),
         display_board(NewBoard),
         (   win(NewBoard, Player)
-        ->  format('Player ~w wins!~n', [Player])
+        ->  format('Player ~w wins!~n', [Player]),
+            ask_replay_2_humans()
         ;   next_player(Player, NextPlayer),
             play_turn_2_humans(NewBoard, NextPlayer)
         )
@@ -415,3 +418,40 @@ best_move_loop([Move|Moves], Board, Player, Depth, BestScoreSoFar, BestColSoFar,
         NewBestCol = BestColSoFar
     ),
     best_move_loop(Moves, Board, Player, Depth, NewBestScore, NewBestCol, BestCol).
+
+ask_replay_oneAI(Difficulty) :-
+    write('Do you want to play again with the same difficulty? (y/n): '),
+    read(Choice),
+    (   Choice = y
+    ->  % Rejouer
+        init_board(Board),
+        display_board(Board),
+        % On relance la même boucle de jeu "1 humain vs IA" :
+        play_turn_1_human(Board, x, Difficulty)
+    ;   Choice = n
+    ->  % Quitter
+        write('Goodbye.'), nl,
+        abort
+    ;   % Choix invalide
+        write('Invalid choice, please try again.'), nl,
+        ask_replay_oneAI(Difficulty)
+    ).
+
+ask_replay_2_humans() :-
+    write('Do you want to play again y? (y/n): '),
+    read(Choice),
+    (   Choice = y
+    ->  % Rejouer
+        init_board(Board),
+        display_board(Board),
+        % On relance la même boucle de jeu "1 humain vs IA" :
+        play_turn_2_humans(Board, x)
+    ;   Choice = n
+    ->  % Quitter
+        write('Goodbye.'), nl,
+        abort
+    ;   % Choix invalide
+        write('Invalid choice, please try again.'), nl,
+        ask_replay_2_humans()
+    ).
+
