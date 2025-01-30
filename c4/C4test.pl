@@ -162,7 +162,7 @@ play :-
         play_turn_2_ais(Board, x, DifficultyX, DifficultyO)
     ;   NumPlayers = 1
     ->  % 1 joueur humain contre une IA
-        write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard): '),
+        write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard, 4: Strategic AI): '),
         read(Difficulty),
         init_board(Board),
         display_board(Board),
@@ -279,6 +279,16 @@ ai_move(Board, Player, NewBoard, 3) :-
         insert_in_column(Board, BestCol, Player, NewBoard)
     ).
 
+ai_move(Board, Player, NewBoard, 4) :-
+    Depth = 6,  % Slightly deeper search for Eval=2
+    best_move_alpha_beta(Board, Player, Depth, BestCol, 2),  % 2 => New evaluation
+    (   BestCol == nil
+    ->  writeln('No valid moves! Playing randomly.'),
+        random_ai_move(Board, Player, NewBoard)
+    ;   format('AI (Eval=2) chose column ~d~n', [BestCol]),
+        insert_in_column(Board, BestCol, Player, NewBoard)
+    ).
+
 % ---------------------------------
 %  9- IA ALÉATOIRE
 % ---------------------------------
@@ -325,6 +335,15 @@ evaluate_board(Board, Player, Score, Eval) :-
        center_bonus(Board, Player, CenterBonus),
        sum_list(Scores, RawScore),
        Score is RawScore + CenterBonus
+    ;  % New evaluation if Eval=2 (Center Control + Threat Prioritization)
+       Eval = 2,
+       next_player(Player, Opponent),
+       findall(S, (
+           (line(Board, L), score_new_heuristic(L, Player, Opponent, S))
+       ), Scores),
+       sum_list(Scores, RawScore),
+       position_bonus(Board, Player, PosScore),
+       Score is RawScore + PosScore
     ).
 
 % Get all possible lines (rows, columns, diagonals)
@@ -394,6 +413,38 @@ center_bonus(Board, Player, Bonus) :-
     length(Centers, Count),
     % e.g. +30 per piece in the center column
     Bonus is 30 * Count.
+
+score_new_heuristic(Line, Player, Opponent, Score) :-
+    (   consecutive_four(Line, Player) -> Score is 1000000  % Immediate win
+    ;   consecutive_four(Line, Opponent) -> Score is -1000000  % Block loss
+    ;   append(_, [Player, Player, e, Player|_], Line) -> Score is 500  % AI fork setup
+    ;   append(_, [Opponent, Opponent, e, Opponent|_], Line) -> Score is -500  % Opponent fork setup
+    ;   three_in_a_row(Line, Player) -> Score is 100  % Near-win
+    ;   three_in_a_row(Line, Opponent) -> Score is -200  % Blocking is more important
+    ;   two_in_a_row(Line, Player) -> Score is 40  % Strong setup
+    ;   two_in_a_row(Line, Opponent) -> Score is -50  % Stop opponent setup
+    ;   Score is 0
+    ).
+
+% Center columns are more valuable
+position_value(4, 3).  % Center column (best spot)
+position_value(3, 2).  % Slightly valuable
+position_value(5, 2).
+position_value(2, 1).  % Less valuable
+position_value(6, 1).
+position_value(1, 0).  % Edge (least valuable)
+position_value(7, 0).
+
+% Calculate position bonus
+position_bonus(Board, Player, Score) :-
+    transpose(Board, Transposed),
+    findall(PosValue, (
+        nth1(Col, Transposed, Column),
+        nth1(Row, Column, Player),  % Find player's pieces
+        position_value(Col, PosValue)
+    ), PosScores),
+    sum_list(PosScores, Score).
+
 
 % terminal_state : vrai si état terminal OU profondeur épuisée
 terminal_state(Board, Depth, Player, Score, true, Eval) :-
