@@ -112,7 +112,7 @@ consecutive_four(List, Mark) :-
 % Vérifie si une colonne est valide
 valid_column(Board, Col) :-
     nonvar(Board),                         % Vérifie que le plateau est instancié
-    between(1, 6, Col),                    % Génère les colonnes valides (1 à 7)
+    between(1, 7, Col),                    % Génère les colonnes valides (1 à 7)
     nth1(Col, Board, Column),              % Récupère la colonne correspondante
     member(e, Column).                     % Vérifie s'il y a une case vide dans la colonne
 
@@ -133,7 +133,13 @@ play_turn(Board, Player, Difficulty) :-
         ->  insert_in_column(Board, Col, Player, NewBoard), % Met à jour le plateau
             display_board(NewBoard),
             (   win(NewBoard, Player)
-            ->  format('Player ~w wins!~n', [Player])
+            ->  format('Player ~w wins!~n', [Player]),
+                write('Do you want to play again? (1: Yes, 2: No): '), nl,
+                read(Choice),
+                (   Choice =:= 1
+                ->  play  % Relance une nouvelle partie
+                ;   write('Goodbye!'), nl
+                )
             ;   next_player(Player, NextPlayer),
                 play_turn(NewBoard, NextPlayer, Difficulty) % Passe le nouveau plateau
             )
@@ -143,7 +149,13 @@ play_turn(Board, Player, Difficulty) :-
     ;   ai_move(Board, Player, NewBoard, Difficulty), % L'IA joue son tour
         display_board(NewBoard),
         (   win(NewBoard, Player)
-        ->  write('AI wins!~n')
+        ->  write('AI wins!~n'),
+            write('Do you want to play again? (1: Yes, 2: No): '), nl,
+            read(Choice),
+            (   Choice =:= 1
+            ->  play  % Relance une nouvelle partie
+            ;   write('Goodbye!'), nl
+            )
         ;   next_player(Player, NextPlayer),
             play_turn(NewBoard, NextPlayer, Difficulty) % Passe le plateau mis à jour
         )
