@@ -149,36 +149,106 @@ next_player(o, x).
 % -------------------------------
 
 play :-
-    write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard): '),
-    read(Difficulty),
-    init_board(Board),
-    display_board(Board),
-    play_turn(Board, x, Difficulty).
+    write('How many human players? (0, 1, or 2): '),
+    read(NumPlayers),
+    (   NumPlayers = 0
+    ->  % IA vs IA
+        write('Difficulty for AI (X) (1: Easy, 2: Medium, 3: Hard): '),
+        read(DifficultyX),
+        write('Difficulty for AI (O) (1: Easy, 2: Medium, 3: Hard): '),
+        read(DifficultyO),
+        init_board(Board),
+        display_board(Board),
+        play_turn_2_ais(Board, x, DifficultyX, DifficultyO)
+    ;   NumPlayers = 1
+    ->  % 1 joueur humain contre une IA
+        write('Choose AI difficulty (1: Easy, 2: Medium, 3: Hard): '),
+        read(Difficulty),
+        init_board(Board),
+        display_board(Board),
+        play_turn_1_human(Board, x, Difficulty)
+    ;   NumPlayers = 2
+    ->  % 2 joueurs humains
+        init_board(Board),
+        display_board(Board),
+        play_turn_2_humans(Board, x)
+    ;   % Sinon, entrée invalide
+        writeln('Invalid choice, please enter 0, 1, or 2.'),
+        play
+    ).
 
-% Tour de jeu : alternance humain (x) / IA (o) 
-play_turn(Board, Player, Difficulty) :-
+
+% play_turn_1_human(+Board, +Player, +Difficulty)
+% Gère une partie : 
+% - Player x = Humain
+% - Player o = IA avec Difficulty
+play_turn_1_human(Board, Player, Difficulty) :-
     (   Player = x
-    ->  format('Player ~w, choose a column (1-7): ', [Player]),
+    ->  % Tour du joueur humain
+        format('Player ~w, choose a column (1-7): ', [x]),
         read(Col),
         (   valid_column(Board, Col)
-        ->  insert_in_column(Board, Col, Player, NewBoard),
+        ->  insert_in_column(Board, Col, x, NewBoard),
             display_board(NewBoard),
-            (   win(NewBoard, Player)
-            ->  format('Player ~w wins!~n', [Player])
-            ;   next_player(Player, NextPlayer),
-                play_turn(NewBoard, NextPlayer, Difficulty)
+            (   win(NewBoard, x)
+            ->  writeln('Player X wins!')
+            ;   next_player(x, NextPlayer),
+                play_turn_1_human(NewBoard, NextPlayer, Difficulty)
             )
-        ;   write('Invalid move. Try again.'), nl,
-            play_turn(Board, Player, Difficulty)
+        ;   writeln('Invalid move. Try again.'),
+            play_turn_1_human(Board, x, Difficulty)
         )
-    ;   ai_move(Board, Player, NewBoard, Difficulty),  % L’IA joue
+    ;   % Tour de l'IA
+        ai_move(Board, o, NewBoard, Difficulty),
         display_board(NewBoard),
-        (   win(NewBoard, Player)
-        ->  write('AI wins!~n')
-        ;   next_player(Player, NextPlayer),
-            play_turn(NewBoard, NextPlayer, Difficulty)
+        (   win(NewBoard, o)
+        ->  writeln('AI (O) wins!')
+        ;   next_player(o, NextPlayer),
+            play_turn_1_human(NewBoard, NextPlayer, Difficulty)
         )
     ).
+
+
+
+% play_turn_2_humans(+Board, +Player)
+% Gère une partie avec deux joueurs humains.
+play_turn_2_humans(Board, Player) :-
+    format('Player ~w, choose a column (1-7): ', [Player]),
+    read(Col),
+    (   valid_column(Board, Col)
+    ->  insert_in_column(Board, Col, Player, NewBoard),
+        display_board(NewBoard),
+        (   win(NewBoard, Player)
+        ->  format('Player ~w wins!~n', [Player])
+        ;   next_player(Player, NextPlayer),
+            play_turn_2_humans(NewBoard, NextPlayer)
+        )
+    ;   writeln('Invalid move. Try again.'),
+        play_turn_2_humans(Board, Player)
+    ).
+
+% play_turn_2_ais(+Board, +Player, +DifficultyX, +DifficultyO)
+% Gère une partie entre deux IA (x et o) avec deux niveaux de difficulté différents.
+play_turn_2_ais(Board, Player, DifficultyX, DifficultyO) :-
+    (   Player = x
+    ->  % IA X joue avec sa difficulté
+        ai_move(Board, x, NewBoard, DifficultyX),
+        display_board(NewBoard),
+        (   win(NewBoard, x)
+        ->  writeln('AI (X) wins!')
+        ;   next_player(x, NextPlayer),
+            play_turn_2_ais(NewBoard, NextPlayer, DifficultyX, DifficultyO)
+        )
+    ;   % IA O joue avec sa difficulté
+        ai_move(Board, o, NewBoard, DifficultyO),
+        display_board(NewBoard),
+        (   win(NewBoard, o)
+        ->  writeln('AI (O) wins!')
+        ;   next_player(o, NextPlayer),
+            play_turn_2_ais(NewBoard, NextPlayer, DifficultyX, DifficultyO)
+        )
+    ).
+
 
 % ---------------------------------
 %  8- IA : 3 NIVEAUX DE DIFFICULTÉ
