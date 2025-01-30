@@ -153,7 +153,7 @@ play :-
     read(NumPlayers),
     (   NumPlayers = 0
     ->  % IA vs IA
-        write('Difficulty for AI (X) (1: Easy, 2: Medium, 3: Hard): '),
+        write('Difficulty for AI (X) (0: Easy, 1: Medium, 2: Hard): '),
         read(DifficultyX),
         write('Difficulty for AI (O) (1: Easy, 2: Medium, 3: Hard): '),
         read(DifficultyO),
@@ -270,7 +270,7 @@ ai_move(Board, Player, NewBoard, 2) :-
 
 % Niveau 3 : Hard => Alpha-Beta avec profondeur plus élevée (ex : 5)
 ai_move(Board, Player, NewBoard, 3) :-
-    Depth = 5,
+    Depth = 3,
     best_move_alpha_beta(Board, Player, Depth, BestCol, 1),  % 1 => "advanced" evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
@@ -280,7 +280,7 @@ ai_move(Board, Player, NewBoard, 3) :-
     ).
 
 ai_move(Board, Player, NewBoard, 4) :-
-    Depth = 6,  % Slightly deeper search for Eval=2
+    Depth = 3,  % Slightly deeper search for Eval=2
     best_move_alpha_beta(Board, Player, Depth, BestCol, 2),  % 2 => New evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
