@@ -164,7 +164,8 @@ play_turn(Board, Player, Difficulty) :-
         ->  insert_in_column(Board, Col, Player, NewBoard),
             display_board(NewBoard),
             (   win(NewBoard, Player)
-            ->  format('Player ~w wins!~n', [Player])
+            ->  format('Player ~w wins!~n', [Player]),
+                ask_replay(Difficulty)           % <-- APPEL SI VICTOIRE DU JOUEUR
             ;   next_player(Player, NextPlayer),
                 play_turn(NewBoard, NextPlayer, Difficulty)
             )
@@ -174,11 +175,13 @@ play_turn(Board, Player, Difficulty) :-
     ;   ai_move(Board, Player, NewBoard, Difficulty),  % L’IA joue
         display_board(NewBoard),
         (   win(NewBoard, Player)
-        ->  write('AI wins!~n')
+        ->  write('AI wins!~n'),
+            ask_replay(Difficulty)               % <-- APPEL SI VICTOIRE DE L'IA
         ;   next_player(Player, NextPlayer),
             play_turn(NewBoard, NextPlayer, Difficulty)
         )
     ).
+
 
 % ---------------------------------
 %  8- IA : 3 NIVEAUX DE DIFFICULTÉ
@@ -244,45 +247,18 @@ head_tail([H|T], H, T).
 % 11- ALPHA-BETA : IMPLEMENTATION
 % ---------------------------------
 
-%%% evaluate_board(+Board, +Player, -Score)
+%%% Évaluation simple :
+%%% +100000 si Board gagnant pour Player
+%%% -100000 si gagnant pour l’adversaire
+%%% 0 sinon
 evaluate_board(Board, Player, Score) :-
-    opponent(Player, Opponent),
-    findall(S, (line(Board, L), score_line(L, Player, Opponent, S)), Scores),
-    sum_list(Scores, Score).
-
-% Get all possible lines (rows, columns, diagonals)
-line(Board, Line) :- member(Line, Board). % Rows
-line(Board, Line) :- transpose(Board, Transposed), member(Line, Transposed). % Columns
-line(Board, Line) :- diagonals_desc(Board, Diags), member(Line, Diags). % Descending diagonals
-line(Board, Line) :- diagonals_asc(Board, Diags), member(Line, Diags). % Ascending diagonals
-
-% Assign scores to a given line
-score_line(Line, Player, Opponent, Score) :-
-    (   consecutive_four(Line, Player) -> Score is 1000
-    ;   consecutive_four(Line, Opponent) -> Score is -1000
-    ;   three_in_a_row(Line, Player) -> Score is 50
-    ;   three_in_a_row(Line, Opponent) -> Score is -50
-    ;   two_in_a_row(Line, Player) -> Score is 10
-    ;   two_in_a_row(Line, Opponent) -> Score is -10
-    ;   Score is 0
+    next_player(Player, Opp),
+    (   win(Board, Player)
+    ->  Score = 100000
+    ;   win(Board, Opp)
+    ->  Score = -100000
+    ;   Score = 0
     ).
-
-% Check if there are three pieces in a row with one empty spot
-three_in_a_row(Line, Player) :-
-    append(_, [Player, Player, Player, e|_], Line).
-three_in_a_row(Line, Player) :-
-    append(_, [e, Player, Player, Player|_], Line).
-
-% Check if there are two pieces in a row with two empty spots
-two_in_a_row(Line, Player) :-
-    append(_, [Player, Player, e, e|_], Line).
-two_in_a_row(Line, Player) :-
-    append(_, [e, e, Player, Player|_], Line).
-
-% Get opponent
-opponent(x, o).
-opponent(o, x).
-
 
 %%% terminal_state : vrai si état terminal OU profondeur épuisée
 terminal_state(Board, Depth, Player, Score, true) :-
@@ -345,3 +321,25 @@ best_move_loop([Move|Moves], Board, Player, Depth, BestScoreSoFar, BestColSoFar,
         NewBestCol = BestColSoFar
     ),
     best_move_loop(Moves, Board, Player, Depth, NewBestScore, NewBestCol, BestCol).
+
+
+ask_replay(Difficulty) :-
+    write('Do you want to play again with the same difficulty? (y/n): '),
+    read(Choice),
+    (   Choice = y
+    ->  % Rejouer
+        init_board(Board),
+        display_board(Board),
+        play_turn(Board, x, Difficulty)
+    ;   Choice = n
+    ->  % Sortir du jeu, ici on se contente d’échouer pour revenir au prompt
+        write('Goodbye.'), nl,
+        abort
+    ;   % Choix invalide
+        write('Invalid choice, please try again.'), nl,
+        ask_replay(Difficulty)
+    ).
+
+
+
+
