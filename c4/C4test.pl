@@ -243,12 +243,10 @@ play_turn_2_ais(Board, Player, DifficultyX, DifficultyO) :-
 
 % Niveau 1 : Aléatoire
 ai_move(Board, Player, NewBoard, 1) :-
-    retractall(recorded(_, _)),    % Clear cache each move
     random_ai_move(Board, Player, NewBoard).
 
 % Niveau 2 : Medium => Alpha-Beta (Depth=2) with Basic Eval
 ai_move(Board, Player, NewBoard, 2) :-
-    retractall(recorded(_, _)),
     best_move_alpha_beta(Board, Player, 2, BestCol, 0),  % 0 => basic evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
@@ -268,7 +266,6 @@ ai_move(Board, Player, NewBoard, 2) :-
 
 ai_move(Board, Player, NewBoard, 3) :-
     % Clear cached evaluations
-    retractall(recorded(_, _)),
     % Count how many cells are filled on the board
     count_filled_cells(Board, Count),
     (
@@ -279,7 +276,7 @@ ai_move(Board, Player, NewBoard, 3) :-
         % 2 Otherwise => apply the "aggressive depth reduction"
         (
             Count < 6 -> Depth = 2     % early game
-          ; Count < 20 -> Depth = 3     % mid game
+          ; Count < 30 -> Depth = 3     % mid game
           ;               Depth = 5     % late game
         ),
         % Call alpha-beta with advanced evaluation (Eval=1)
@@ -343,7 +340,6 @@ count_filled_cells(Board, Count) :-
 
 % Niveau 4 : "Strategic" => More Aggressive Depth with "Eval=2"
 ai_move(Board, Player, NewBoard, 4) :-
-    retractall(recorded(_, _)),
     count_filled_cells(Board, Count),
     (   Count < 12 -> Depth = 3  % early => Depth=3
     ;   Count < 25 -> Depth = 4  % mid => Depth=4
@@ -505,7 +501,7 @@ position_bonus(Board, Player, Score) :-
     ), PosScores),
     sum_list(PosScores, Score).
 
-% Alpha-Beta with Move Ordering
+% Alpha-Beta avec tri favorisant les colonnes centrales
 alpha_beta(Board, Depth, Alpha, Beta, Player, Score, Eval) :-
     terminal_state(Board, Depth, Player, Val, GameOver, Eval),
     (   GameOver == true
@@ -513,21 +509,36 @@ alpha_beta(Board, Depth, Alpha, Beta, Player, Score, Eval) :-
     ;   findall(Col, valid_column(Board, Col), Moves),
         (   Moves = []
         ->  evaluate_board(Board, Player, Score, Eval)  % Plateau plein => match nul ?
-        ;   order_moves(Board, Moves, Player, OrderedMoves, Eval),  % Sort moves
+        ;   safe_order_moves(Board, Moves, Player, OrderedMoves, Eval),  % Trier les coups pour favoriser le centre
             alpha_beta_loop(OrderedMoves, Board, Depth, Alpha, Beta, Player, Score, Eval)
         )
     ).
 
-order_moves(Board, Moves, Player, OrderedMoves, Eval) :-
-    findall(Sc-Col, (
-        member(Col, Moves),
-        insert_in_column(Board, Col, Player, NewBoard),
-        evaluate_board(NewBoard, Player, Sc, Eval)
-    ), Pairs),
-    keysort(Pairs, SortedLowToHigh),
-    reverse(SortedLowToHigh, HighToLow),
-    pairs_values(HighToLow, OrderedMoves).
+% Sécurisation du tri des coups
+safe_order_moves(Board, Moves, Player, OrderedMoves, Eval) :-
+    catch(order_moves(Board, Moves, Player, OrderedMoves, Eval), _, OrderedMoves = Moves).
 
+% Tri des coups en favorisant le centre et en évaluant leur potentiel
+order_moves(Board, Moves, Player, OrderedMoves, Eval) :-
+    findall(Score-Col, (
+        member(Col, Moves),
+        valid_column(Board, Col),  % Vérifier que la colonne est valide
+        insert_in_column(Board, Col, Player, NewBoard),
+        evaluate_board(NewBoard, Player, Score, Eval),
+        center_bonus(Col, CenterWeight),
+        AdjustedScore is Score + CenterWeight  % Favorise les colonnes centrales
+    ), Pairs),
+    sort(1, @>=, Pairs, SortedPairs),  % Trier en ordre décroissant
+    pairs_values(SortedPairs, OrderedMoves).
+
+% Bonus pour favoriser les colonnes centrales
+center_bonus(Col, Bonus) :-
+    (Col = 4 -> Bonus is 30;
+     Col = 3; Col = 5 -> Bonus is 20;
+     Col = 2; Col = 6 -> Bonus is 10;
+     Col = 1; Col = 7 -> Bonus is 0).
+
+% Boucle principale Alpha-Beta avec élagage
 alpha_beta_loop([], _, _, Alpha, _, _, Alpha, _).
 alpha_beta_loop([Move|Moves], Board, Depth, Alpha, Beta, Player, BestScore, Eval) :-
     insert_in_column(Board, Move, Player, NewBoard),
@@ -535,12 +546,13 @@ alpha_beta_loop([Move|Moves], Board, Depth, Alpha, Beta, Player, BestScore, Eval
     NewDepth is Depth - 1,
     alpha_beta(NewBoard, NewDepth, -Beta, -Alpha, NextPlayer, ValNeg, Eval),
     Val is -ValNeg,
-    (   Val >= Beta
+    (   Val >= Beta  % Coup trop bon pour ladversaire => on coupe
     ->  BestScore = Val
     ;   NewAlpha is max(Alpha, Val),
         alpha_beta_loop(Moves, Board, Depth, NewAlpha, Beta, Player, BestScore, Eval)
     ).
 
+% Sélection du meilleur coup
 best_move_alpha_beta(Board, Player, Depth, BestCol, Eval) :-
     findall(Col, valid_column(Board, Col), ValidMoves),
     (   ValidMoves = []
