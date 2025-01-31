@@ -257,21 +257,89 @@ ai_move(Board, Player, NewBoard, 2) :-
         insert_in_column(Board, BestCol, Player, NewBoard)
     ).
 
-% Niveau 3 : Hard => More Aggressive Depth Reduction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% IA DIFFICULTE 3 : 1) Premiers coups => [3,4,5] aléatoire %
+%                     2) Ensuite => Depth agressif         %
+%                        - si Count <12 => Depth=2         %
+%                        - si Count <25 => Depth=3         %
+%                        - else        => Depth=5          %
+%                     3) Fallback random si plus de coups  %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 ai_move(Board, Player, NewBoard, 3) :-
+    % Clear cached evaluations
     retractall(recorded(_, _)),
+    % Count how many cells are filled on the board
     count_filled_cells(Board, Count),
-    (   Count < 12 -> Depth = 2  % early => Depth=2
-    ;   Count < 25 -> Depth = 3  % mid => Depth=3
-    ;   Depth = 5               % late => Depth=5
-    ),
-    best_move_alpha_beta(Board, Player, Depth, BestCol, 1),  % 1 => advanced
-    (   BestCol == nil
-    ->  writeln('No valid moves! Playing randomly.'),
-        random_ai_move(Board, Player, NewBoard)
-    ;   format('AI chose column ~d (Depth=~d)~n', [BestCol, Depth]),
-        insert_in_column(Board, BestCol, Player, NewBoard)
+    (
+        % 1 If fewer than 3 cells are filled => random among cols [3,4,5]
+        Count < 3 ->
+            random_central_move_3(Board, Player, NewBoard)
+        ;
+        % 2 Otherwise => apply the "aggressive depth reduction"
+        (
+            Count < 6 -> Depth = 2     % early game
+          ; Count < 20 -> Depth = 3     % mid game
+          ;               Depth = 5     % late game
+        ),
+        % Call alpha-beta with advanced evaluation (Eval=1)
+        best_move_alpha_beta(Board, Player, Depth, BestCol, 1),
+        (   BestCol == nil
+        ->  writeln('No valid moves! Playing randomly.'),
+            random_ai_move(Board, Player, NewBoard)
+        ;   format('AI (Hard) chose column ~d (Depth=~d)~n', [BestCol, Depth]),
+            insert_in_column(Board, BestCol, Player, NewBoard)
+        )
     ).
+
+%
+% random_central_move_3/3
+%  - Chooses randomly among columns [3,4,5] if valid
+%  - If none is valid, fallback to the alpha-beta logic above
+%
+random_central_move_3(Board, Player, NewBoard) :-
+    findall(Col,
+        (   member(Col, [3,4,5]),
+            valid_column(Board, Col)
+        ),
+        ValidCentralCols
+    ),
+    (
+        ValidCentralCols = []
+        ->  % If no central columns valid, we do a fallback:
+            % Use the same "aggressive depth" approach
+            count_filled_cells(Board, Count),
+            (
+                Count < 12 -> Depth = 2
+              ; Count < 25 -> Depth = 3
+              ;               Depth = 5
+            ),
+            best_move_alpha_beta(Board, Player, Depth, BestCol, 1),
+            (   BestCol == nil
+            ->  writeln('No valid moves! Playing randomly.'),
+                random_ai_move(Board, Player, NewBoard)
+            ;   format('AI (Hard fallback) chose column ~d (Depth=~d)~n', [BestCol, Depth]),
+                insert_in_column(Board, BestCol, Player, NewBoard)
+            )
+        ;   % Otherwise pick one of the central columns randomly
+            random_member(ChosenCol, ValidCentralCols),
+            format('AI (Hard) first moves, picks among [3,4,5], chooses column ~d~n', [ChosenCol]),
+            insert_in_column(Board, ChosenCol, Player, NewBoard)
+    ).
+
+%
+% count_filled_cells/2
+%  - Count how many cells in the board are not 'e'
+%
+count_filled_cells(Board, Count) :-
+    findall(Cell,
+            (
+                member(Row, Board),
+                member(Cell, Row),
+                Cell \= e
+            ),
+            Cells),
+    length(Cells, Count).
 
 % Niveau 4 : "Strategic" => More Aggressive Depth with "Eval=2"
 ai_move(Board, Player, NewBoard, 4) :-
