@@ -718,7 +718,7 @@ get_item2( [], _N, _A, V) :-
     V = [], !,
     fail
         .
-
+    
 get_item2( [H|_T], N, A, V) :- 
     A = N,
     V = H
