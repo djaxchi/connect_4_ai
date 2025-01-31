@@ -239,29 +239,70 @@ ai_move(Board, Player, NewBoard, 1) :-
     retractall(recorded(_, _)),    % Clear cache each move
     random_ai_move(Board, Player, NewBoard).
 
-% Niveau 2 : Medium => Alpha-Beta (Depth=3) with Basic Eval
+% Niveau 2 : Medium => Alpha-Beta (Depth=2) with Basic Eval
 ai_move(Board, Player, NewBoard, 2) :-
     retractall(recorded(_, _)),
-    best_move_alpha_beta(Board, Player, 3, BestCol, 0),  % 0 => basic evaluation
+    best_move_alpha_beta(Board, Player, 2, BestCol, 0),  % 0 => basic evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
         random_ai_move(Board, Player, NewBoard)
     ;   format('AI chose column ~d~n', [BestCol]),
         insert_in_column(Board, BestCol, Player, NewBoard)
     ).
+
+
+random_central_move(Board, Player, NewBoard) :-
+    findall(Col,
+        (   member(Col, [3,4,5]),
+            valid_column(Board, Col)
+        ),
+        ValidCentralCols
+    ),
+    (
+        ValidCentralCols = []
+        ->  % If no central columns are valid, do alpha-beta
+            alpha_beta_move(Board, Player, NewBoard)
+        ;   % Otherwise pick one of them at random
+            random_member(ChosenCol, ValidCentralCols),
+            format('AI (difficulty 3) tries mid columns, chooses column ~d~n', [ChosenCol]),
+            insert_in_column(Board, ChosenCol, Player, NewBoard)
+    ).
+
+%
+% alpha_beta_move/3 : fallback to usual alpha-beta (depth=3, "advanced" eval=1)
+%
+alpha_beta_move(Board, Player, NewBoard) :-
+    best_move_alpha_beta(Board, Player, 3, BestCol, 1),  % 1 => advanced evaluation
+    (   BestCol == nil
+    ->  writeln('No valid moves! Playing randomly.'),
+        random_ai_move(Board, Player, NewBoard)
+    ;   format('AI (difficulty 3) chose column ~d~n', [BestCol]),
+        insert_in_column(Board, BestCol, Player, NewBoard)
+    ).
+
+%
+% count_moves/2 : Count how many total pieces (x or o) are on the board.
+%
+count_moves(Board, Count) :-
+    findall(Cell,
+        (
+            member(Row, Board),
+            member(Cell, Row),
+            Cell \= e
+        ),
+        Cells),
+    length(Cells, Count).
 
 % Niveau 3 : Hard => Alpha-Beta (Depth=5) with Advanced Eval
 ai_move(Board, Player, NewBoard, 3) :-
     retractall(recorded(_, _)),
-    best_move_alpha_beta(Board, Player, 5, BestCol, 1),  % 1 => advanced evaluation
-    (   BestCol == nil
-    ->  writeln('No valid moves! Playing randomly.'),
-        random_ai_move(Board, Player, NewBoard)
-    ;   format('AI chose column ~d~n', [BestCol]),
-        insert_in_column(Board, BestCol, Player, NewBoard)
+    count_moves(Board, MoveCount),
+    (
+        MoveCount < 3
+        ->  random_central_move(Board, Player, NewBoard)
+        ;   alpha_beta_move(Board, Player, NewBoard)
     ).
 
-% Niveau 4 : "Strategic" => Alpha-Beta (Depth=6) with "Eval=2"
 ai_move(Board, Player, NewBoard, 4) :-
     retractall(recorded(_, _)),
     best_move_alpha_beta(Board, Player, 6, BestCol, 2),  % 2 => new heuristic
