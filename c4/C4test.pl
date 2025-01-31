@@ -6,6 +6,55 @@
 %  1- INITIALISATION DU PLATEAU
 % --------------------------------
 
+:- dynamic
+    total_time_x/1,
+    total_time_o/1,
+    moves_x/1,
+    moves_o/1.
+
+reset_ia_timers :-
+    retractall(total_time_x(_)),
+    retractall(total_time_o(_)),
+    retractall(moves_x(_)),
+    retractall(moves_o(_)),
+    asserta(total_time_x(0.0)),
+    asserta(total_time_o(0.0)),
+    asserta(moves_x(0)),
+    asserta(moves_o(0)).
+
+
+store_time_for_ia(x, Duration) :-
+    retract(total_time_x(T0)),
+    T1 is T0 + Duration,
+    asserta(total_time_x(T1)),
+
+    retract(moves_x(M0)),
+    M1 is M0 + 1,
+    asserta(moves_x(M1)).
+
+store_time_for_ia(o, Duration) :-
+    retract(total_time_o(T0)),
+    T1 is T0 + Duration,
+    asserta(total_time_o(T1)),
+
+    retract(moves_o(M0)),
+    M1 is M0 + 1,
+    asserta(moves_o(M1)).
+
+report_ia_times :-
+    total_time_x(Tx), moves_x(Mx),
+    total_time_o(To), moves_o(Mo),
+    ( Mx > 0 ->
+        AvgX is Tx / Mx
+      ; AvgX = 0
+    ),
+    ( Mo > 0 ->
+        AvgO is To / Mo
+      ; AvgO = 0
+    ),
+    format("IA X => total time: ~2f s, moves: ~d, avg per move: ~2f s~n", [Tx, Mx, AvgX]),
+    format("IA O => total time: ~2f s, moves: ~d, avg per move: ~2f s~n", [To, Mo, AvgO]).
+
 init_board(Board) :-
     Board = [[e, e, e, e, e, e, e],
              [e, e, e, e, e, e, e],
@@ -237,6 +286,74 @@ play_turn_2_ais(Board, Player, DifficultyX, DifficultyO) :-
         )
     ).
 
+% play_turn_2_ais(+Board, +Player, +DifficultyX, +DifficultyO, -Winner)
+% Gère une partie entre deux IA, unifie Winner à x ou o.
+play_turn_2_ais(Board, Player, DiffX, DiffO, Winner) :-
+    (   Player = x
+    ->  ai_move(Board, x, NewBoard, DiffX),
+        (   win(NewBoard, x)
+        ->  Winner = x
+        ;   next_player(x, NextPlayer),
+            play_turn_2_ais(NewBoard, NextPlayer, DiffX, DiffO, Winner)
+        )
+    ;   ai_move(Board, o, NewBoard, DiffO),
+        (   win(NewBoard, o)
+        ->  Winner = o
+        ;   next_player(o, NextPlayer),
+            play_turn_2_ais(NewBoard, NextPlayer, DiffX, DiffO, Winner)
+        )
+    ).
+
+    % one_game_ai_vs_ai(+DiffX, +DiffO, -Winner)
+% Lance une partie "IA X vs IA O" avec les difficultés spécifiées, renvoie x ou o (ou draw).
+one_game_ai_vs_ai(DiffX, DiffO, Winner) :-
+    init_board(Board),
+    play_turn_2_ais(Board, x, DiffX, DiffO, Winner).
+
+
+% run_n_games(+DiffX, +DiffO, +N, -WinsX, -WinsO, -Draws, -TotalTime)
+% Lance N parties IA(X) vs IA(O). Retourne stats + temps cumulé.
+run_n_games(_, _, 0, 0, 0, 0, 0) :- !.  % plus de parties à jouer
+
+run_n_games(DiffX, DiffO, N, WinsX, WinsO, Draws, TotalTime) :-
+    N > 0,
+    get_time(Start),
+    one_game_ai_vs_ai(DiffX, DiffO, Winner),
+    get_time(End),
+    Elapsed is End - Start,
+    (   Winner = x
+    ->  Wx = 1, Wo = 0, Dr = 0
+    ;   Winner = o
+    ->  Wx = 0, Wo = 1, Dr = 0
+    ;   % si tu gères un match nul
+        Wx = 0, Wo = 0, Dr = 1
+    ),
+    N1 is N - 1,
+    run_n_games(DiffX, DiffO, N1, Wx2, Wo2, Dr2, T2),
+    WinsX is Wx + Wx2,
+    WinsO is Wo + Wo2,
+    Draws is Dr + Dr2,
+    TotalTime is Elapsed + T2.
+
+benchmark_ai_vs_ai(DiffX, DiffO, NumGames) :-
+    % Réinitialiser les compteurs IA
+    reset_ia_timers,
+
+    % Lancer N parties, accumuler victoires et temps global
+    run_n_games(DiffX, DiffO, NumGames, WinsX, WinsO, Draws, TotalTime),
+
+    % Affiche les stats globales
+    writeln("-----------------------------------------------------"),
+    format("Benchmark Done: ~d games between X=~w and O=~w~n", [NumGames, DiffX, DiffO]),
+    format("X wins=~d, O wins=~d, draws=~d, total time=~2f s~n", [WinsX, WinsO, Draws, TotalTime]),
+    ( NumGames > 0 -> AvgTime is TotalTime / NumGames ; AvgTime = 0 ),
+    format("Average time per game: ~2f s~n", [AvgTime]),
+
+    % Temps de réflexion moyen pour chaque IA
+    report_ia_times,
+    writeln("-----------------------------------------------------").
+
+
 % ---------------------------------
 %  8- IA : 3 (ou 4) NIVEAUX DE DIFFICULTÉ
 % ---------------------------------
@@ -244,11 +361,16 @@ play_turn_2_ais(Board, Player, DifficultyX, DifficultyO) :-
 % Niveau 1 : Aléatoire
 ai_move(Board, Player, NewBoard, 1) :-
     retractall(recorded(_, _)),    % Clear cache each move
-    random_ai_move(Board, Player, NewBoard).
+    get_time(Start),
+    random_ai_move(Board, Player, NewBoard),
+    get_time(End),
+    Elapsed is End - Start,
+    store_time_for_ia(Player, Elapsed).
 
 % Niveau 2 : Medium => Alpha-Beta (Depth=2) with Basic Eval
 ai_move(Board, Player, NewBoard, 2) :-
     retractall(recorded(_, _)),
+    get_time(Start),
     best_move_alpha_beta(Board, Player, 2, BestCol, 0),  % 0 => basic evaluation
     (   BestCol == nil
     ->  writeln('No valid moves! Playing randomly.'),
@@ -269,6 +391,7 @@ ai_move(Board, Player, NewBoard, 2) :-
 ai_move(Board, Player, NewBoard, 3) :-
     % Clear cached evaluations
     retractall(recorded(_, _)),
+    get_time(Start),
     % Count how many cells are filled on the board
     count_filled_cells(Board, Count),
     (
@@ -319,7 +442,9 @@ random_central_move_3(Board, Player, NewBoard) :-
             ->  writeln('No valid moves! Playing randomly.'),
                 random_ai_move(Board, Player, NewBoard)
             ;   format('AI (Hard fallback) chose column ~d (Depth=~d)~n', [BestCol, Depth]),
-                insert_in_column(Board, BestCol, Player, NewBoard)
+                insert_in_column(Board, BestCol, Player, NewBoard),
+        get_time(End),
+        Elapsed is End - Start
             )
         ;   % Otherwise pick one of the central columns randomly
             random_member(ChosenCol, ValidCentralCols),
@@ -344,6 +469,7 @@ count_filled_cells(Board, Count) :-
 % Niveau 4 : "Strategic" => More Aggressive Depth with "Eval=2"
 ai_move(Board, Player, NewBoard, 4) :-
     retractall(recorded(_, _)),
+    get_time(Start),
     count_filled_cells(Board, Count),
     (   Count < 12 -> Depth = 3  % early => Depth=3
     ;   Count < 25 -> Depth = 4  % mid => Depth=4
@@ -355,6 +481,8 @@ ai_move(Board, Player, NewBoard, 4) :-
         random_ai_move(Board, Player, NewBoard)
     ;   format('AI (Eval=2) chose column ~d (Depth=~d)~n', [BestCol, Depth]),
         insert_in_column(Board, BestCol, Player, NewBoard)
+        get_time(End),
+        Elapsed is End - Start
     ).
 
 % ---------------------------------
@@ -386,9 +514,8 @@ head_tail([H|T], H, T).
 %%% Evaluate with caching (prints debug)
 evaluate_board(Board, Player, Score, Eval) :-
     term_to_atom(Board, Key),  % Convert board to a unique key
-    (   recorded(Key, Score) -> true
+    (  
     ;   compute_board_score(Board, Player, Score, Eval),
-        recorda(Key, Score)
     ).
 
 
