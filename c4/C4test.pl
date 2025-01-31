@@ -369,7 +369,10 @@ ai_move(Board, Player, NewBoard, 2) :-
     ->  writeln('No valid moves! Playing randomly.'),
         random_ai_move(Board, Player, NewBoard)
     ;   format('AI chose column ~d~n', [BestCol]),
-        insert_in_column(Board, BestCol, Player, NewBoard)
+        insert_in_column(Board, BestCol, Player, NewBoard),
+        get_time(End),
+        Elapsed is End - Start,
+        store_time_for_ia(Player, Elapsed).
     ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -402,7 +405,10 @@ ai_move(Board, Player, NewBoard, 3) :-
         ->  writeln('No valid moves! Playing randomly.'),
             random_ai_move(Board, Player, NewBoard)
         ;   format('AI (Hard) chose column ~d (Depth=~d)~n', [BestCol, Depth]),
-            insert_in_column(Board, BestCol, Player, NewBoard)
+            insert_in_column(Board, BestCol, Player, NewBoard),
+            get_time(End),
+            Elapsed is End - Start,
+            store_time_for_ia(Player, Elapsed).
         )
     ).
 
@@ -434,8 +440,7 @@ random_central_move_3(Board, Player, NewBoard) :-
                 random_ai_move(Board, Player, NewBoard)
             ;   format('AI (Hard fallback) chose column ~d (Depth=~d)~n', [BestCol, Depth]),
                 insert_in_column(Board, BestCol, Player, NewBoard),
-        get_time(End),
-        Elapsed is End - Start
+                
             )
         ;   % Otherwise pick one of the central columns randomly
             random_member(ChosenCol, ValidCentralCols),
@@ -472,6 +477,7 @@ ai_move(Board, Player, NewBoard, 4) :-
         insert_in_column(Board, BestCol, Player, NewBoard)
         get_time(End),
         Elapsed is End - Start
+        store_time_for_ia(Player, Elapsed).
     ).
 
 % ---------------------------------
